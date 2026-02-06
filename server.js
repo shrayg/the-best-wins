@@ -58,7 +58,9 @@ if (process.argv.includes('--env-check')) {
 }
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3002;
-const HOST = process.env.HOST || '127.0.0.1';
+// If PORT is provided by the host (Railway/Render), bind to all interfaces.
+// Otherwise default to localhost for local dev safety.
+const HOST = process.env.HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
 
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
