@@ -85,6 +85,7 @@ try {
 
 const SESSION_COOKIE = 'tbw_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const SESSIONS_R2_KEY = 'data/sessions/sessions.json';
 const PEPPER = process.env.TBW_PEPPER || '';
 
 const REF_COOKIE = 'tbw_ref';
@@ -94,6 +95,8 @@ const PREVIEW_LIMIT = 12;
 
 /** @type {Map<string, { userKey: string, createdAt: number }>} */
 const sessions = new Map();
+let sessionsLoaded = false;
+let sessionsWritePromise = Promise.resolve();
 
 /** @type {null | {version:number, users: Record<string, any>}} */
 let usersDb = null;
@@ -612,6 +615,7 @@ function getAuthedUserKey(req) {
   const ageSeconds = (Date.now() - sess.createdAt) / 1000;
   if (ageSeconds > SESSION_TTL_SECONDS) {
     sessions.delete(token);
+    void persistSessionsToR2();
     return null;
   }
   return sess.userKey;
@@ -818,6 +822,70 @@ function isValidPassword(password) {
   return typeof password === 'string' && password.length >= 8 && password.length <= 200;
 }
 
+function buildSessionsSnapshot() {
+  const out = {};
+  const now = Date.now();
+  for (const [tok, sess] of sessions.entries()) {
+    const ageSec = (now - sess.createdAt) / 1000;
+    if (ageSec < SESSION_TTL_SECONDS) {
+      out[tok] = { userKey: sess.userKey, createdAt: sess.createdAt };
+    }
+  }
+  return out;
+}
+
+async function persistSessionsToR2() {
+  if (!R2_ENABLED) return;
+  const snapshot = JSON.stringify(buildSessionsSnapshot(), null, 2);
+  sessionsWritePromise = sessionsWritePromise.then(async () => {
+    await r2PutObject(SESSIONS_R2_KEY, snapshot, 'application/json');
+  }).catch((e) => {
+    console.error('sessions write error:', e && e.message ? e.message : e);
+  });
+  return sessionsWritePromise;
+}
+
+async function loadSessionsOnceFromR2(parsedDb) {
+  if (sessionsLoaded || !R2_ENABLED) return;
+  sessionsLoaded = true;
+
+  try {
+    const raw = await r2GetObject(SESSIONS_R2_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const now = Date.now();
+      if (parsed && typeof parsed === 'object') {
+        for (const [tok, sess] of Object.entries(parsed)) {
+          if (sess && sess.userKey && sess.createdAt) {
+            const ageSec = (now - sess.createdAt) / 1000;
+            if (ageSec < SESSION_TTL_SECONDS) {
+              sessions.set(tok, { userKey: sess.userKey, createdAt: sess.createdAt });
+            }
+          }
+        }
+      }
+      return;
+    }
+  } catch {
+    // ignore and fall back to legacy sessions in users.json
+  }
+
+  if (parsedDb && parsedDb._sessions && typeof parsedDb._sessions === 'object') {
+    const now = Date.now();
+    for (const [tok, sess] of Object.entries(parsedDb._sessions)) {
+      if (sess && sess.userKey && sess.createdAt) {
+        const ageSec = (now - sess.createdAt) / 1000;
+        if (ageSec < SESSION_TTL_SECONDS) {
+          sessions.set(tok, { userKey: sess.userKey, createdAt: sess.createdAt });
+        }
+      }
+    }
+    delete parsedDb._sessions;
+    await persistSessionsToR2();
+    await queueUsersDbWrite();
+  }
+}
+
 function scryptHex(password, saltHex) {
   const salt = Buffer.from(saltHex, 'hex');
   const key = crypto.scryptSync(`${password}${PEPPER}`, salt, 64);
@@ -849,19 +917,7 @@ async function ensureUsersDbFresh() {
     if (!parsed.users || typeof parsed.users !== 'object') parsed.users = {};
     if (!parsed.version) parsed.version = 1;
     usersDb = parsed;
-
-    // Restore persisted sessions
-    if (parsed._sessions && typeof parsed._sessions === 'object') {
-      const now = Date.now();
-      for (const [tok, sess] of Object.entries(parsed._sessions)) {
-        if (sess && sess.userKey && sess.createdAt) {
-          const ageSec = (now - sess.createdAt) / 1000;
-          if (ageSec < SESSION_TTL_SECONDS) {
-            sessions.set(tok, { userKey: sess.userKey, createdAt: sess.createdAt });
-          }
-        }
-      }
-    }
+    await loadSessionsOnceFromR2(parsed);
   } catch {
     usersDb = { version: 1, users: {} };
   }
@@ -869,17 +925,6 @@ async function ensureUsersDbFresh() {
 }
 
 async function queueUsersDbWrite() {
-  // Snapshot sessions into the DB so they survive restarts
-  const sessObj = {};
-  const now = Date.now();
-  for (const [tok, sess] of sessions.entries()) {
-    const ageSec = (now - sess.createdAt) / 1000;
-    if (ageSec < SESSION_TTL_SECONDS) {
-      sessObj[tok] = { userKey: sess.userKey, createdAt: sess.createdAt };
-    }
-  }
-  usersDb._sessions = sessObj;
-
   const snapshot = JSON.stringify(usersDb, null, 2);
   usersDbWritePromise = usersDbWritePromise.then(async () => {
     if (R2_ENABLED) {
@@ -1311,6 +1356,7 @@ const server = http.createServer(async (req, res) => {
 
       const token = crypto.randomBytes(32).toString('hex');
       sessions.set(token, { userKey: key, createdAt: Date.now() });
+      void persistSessionsToR2();
       setSessionCookie(res, token);
       return sendJson(res, 200, { ok: true });
     }
@@ -1321,7 +1367,10 @@ const server = http.createServer(async (req, res) => {
       if (method !== 'POST') return sendJson(res, 405, { error: 'Method Not Allowed' });
       const cookies = parseCookies(req);
       const token = cookies[SESSION_COOKIE];
-      if (token) sessions.delete(token);
+      if (token) {
+        sessions.delete(token);
+        void persistSessionsToR2();
+      }
       clearSessionCookie(res);
       return sendJson(res, 200, { ok: true });
     }
@@ -1770,6 +1819,7 @@ const server = http.createServer(async (req, res) => {
 
       const token = crypto.randomBytes(32).toString('hex');
       sessions.set(token, { userKey, createdAt: Date.now() });
+      void persistSessionsToR2();
       setSessionCookie(res, token);
 
       // Clear referral cookie after Discord signup
