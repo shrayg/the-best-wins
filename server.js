@@ -62,7 +62,19 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 3002;
 // Otherwise default to localhost for local dev safety.
 const HOST = process.env.HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
 
-const DATA_DIR = path.join(__dirname, 'data');
+// Repo root (static assets live here). We intentionally keep static serving locked to this directory.
+const REPO_ROOT = __dirname;
+
+// Optional: store user DB / mega config on a persistent volume (recommended for hosting).
+const DATA_DIR = process.env.TBW_DATA_DIR
+  ? path.resolve(String(process.env.TBW_DATA_DIR))
+  : path.join(REPO_ROOT, 'data');
+
+// Optional: store large media folders on a volume / external disk.
+// Example on Railway volume: TBW_MEDIA_ROOT=/data/media
+const MEDIA_ROOT = process.env.TBW_MEDIA_ROOT
+  ? path.resolve(String(process.env.TBW_MEDIA_ROOT))
+  : REPO_ROOT;
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const MEGA_FILE = path.join(DATA_DIR, 'mega.txt');
 
@@ -701,7 +713,7 @@ function isVideoFile(fileName) {
 async function listMediaFilesForFolder(folder) {
   const folderDirName = allowedFolders.get(folder);
   if (!folderDirName) return [];
-  const folderPath = path.join(__dirname, folderDirName);
+  const folderPath = path.join(MEDIA_ROOT, folderDirName);
   let entries;
   try {
     entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
@@ -815,9 +827,9 @@ function sendFileRange(req, res, filePath, stat) {
 
 function safeFilePath(urlPathname) {
   const decoded = decodeURIComponent(urlPathname);
-  const joined = path.join(__dirname, decoded);
+  const joined = path.join(REPO_ROOT, decoded);
   const normalized = path.normalize(joined);
-  if (!normalized.startsWith(path.normalize(__dirname + path.sep))) {
+  if (!normalized.startsWith(path.normalize(REPO_ROOT + path.sep))) {
     return null;
   }
   return normalized;
@@ -1444,7 +1456,7 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'Invalid folder' });
       }
 
-      const folderPath = path.join(__dirname, folderDirName);
+      const folderPath = path.join(MEDIA_ROOT, folderDirName);
       let entries;
       try {
         entries = await fs.promises.readdir(folderPath, { withFileTypes: true });
@@ -1492,7 +1504,7 @@ const server = http.createServer(async (req, res) => {
       const files = [];
       for (const name of previewNames) {
         const folderDirName = allowedFolders.get(folder);
-        const fullPath = path.join(__dirname, folderDirName, name);
+        const fullPath = path.join(MEDIA_ROOT, folderDirName, name);
         let stat;
         try {
           stat = await fs.promises.stat(fullPath);
@@ -1524,7 +1536,7 @@ const server = http.createServer(async (req, res) => {
       const previewNames = new Set(names.slice(0, PREVIEW_LIMIT));
       if (!previewNames.has(name)) return sendText(res, 403, 'Forbidden');
 
-      const mediaPath = path.join(__dirname, folderDirName, name);
+      const mediaPath = path.join(MEDIA_ROOT, folderDirName, name);
       let stat;
       try {
         stat = await fs.promises.stat(mediaPath);
@@ -1553,7 +1565,7 @@ const server = http.createServer(async (req, res) => {
         return sendText(res, 403, 'Forbidden');
       }
 
-      const mediaPath = path.join(__dirname, folderDirName, name);
+      const mediaPath = path.join(MEDIA_ROOT, folderDirName, name);
       let stat;
       try {
         stat = await fs.promises.stat(mediaPath);
@@ -1600,7 +1612,7 @@ const server = http.createServer(async (req, res) => {
     const normalized = path.normalize(filePath);
     const protectedDirs = [
       path.normalize(DATA_DIR + path.sep),
-      ...Array.from(allowedFolders.values()).map((d) => path.normalize(path.join(__dirname, d) + path.sep)),
+      ...Array.from(allowedFolders.values()).map((d) => path.normalize(path.join(MEDIA_ROOT, d) + path.sep)),
     ];
     for (const pd of protectedDirs) {
       if (normalized.startsWith(pd)) {
