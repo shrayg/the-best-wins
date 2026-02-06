@@ -170,17 +170,25 @@ body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 5200;
-  padding: 12px 16px;
+  padding: 14px 28px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.10);
   cursor: pointer;
+  font-size: 15px;
   font-weight: 900;
   letter-spacing: 1.6px;
   text-transform: uppercase;
   color: #0a0a0f;
   background: linear-gradient(135deg, #22d3ee, #7c3aed, #ff4d6d);
-  box-shadow: 0 14px 60px rgba(0, 0, 0, 0.35);
+  background-size: 200% 200%;
+  animation: tierGlow 3s ease infinite;
+  box-shadow: 0 14px 60px rgba(0, 0, 0, 0.35), 0 0 30px rgba(124, 58, 237, 0.3);
   transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+@keyframes tierGlow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
 .tier-unlocked-btn:hover {

@@ -1061,12 +1061,12 @@ const server = http.createServer(async (req, res) => {
 
       const username = String(body.username || '').trim();
       const password = String(body.password || '');
-      if (!isValidUsername(username)) return sendJson(res, 400, { error: 'Invalid username' });
-      if (!isValidPassword(password)) return sendJson(res, 400, { error: 'Invalid password' });
+      if (!isValidUsername(username)) return sendJson(res, 400, { error: 'Username must be 3-24 characters (letters, numbers, _ or -)' });
+      if (!isValidPassword(password)) return sendJson(res, 400, { error: 'Password must be at least 8 characters' });
 
       const db = await ensureUsersDbFresh();
       const key = username.toLowerCase();
-      if (db.users[key]) return sendJson(res, 409, { error: 'Username exists' });
+      if (db.users[key]) return sendJson(res, 409, { error: 'That username is already taken' });
 
       const salt = crypto.randomBytes(16).toString('hex');
       const hash = scryptHex(password, salt);

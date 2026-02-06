@@ -206,13 +206,21 @@ function renderMediaGrid(grid, items) {
     if (item.type === 'video') {
       div.innerHTML = `
         <div class="media-thumb-wrapper">
-          <video class="media-thumb" src="${item.src}" preload="metadata" muted></video>
+          <video class="media-thumb" preload="metadata" muted playsinline></video>
           <div class="play-icon"></div>
         </div>
         <div class="media-info">
           <div class="name">${item.name}</div>
           <div class="meta">Video ${item.size ? '• ' + formatFileSize(item.size) : ''}</div>
         </div>`;
+
+      // Seek to 0.5s so the browser renders a real frame instead of black
+      const vid = div.querySelector('video');
+      vid.addEventListener('loadeddata', () => {
+        if (vid.duration > 0.5) vid.currentTime = 0.5;
+        else if (vid.duration > 0) vid.currentTime = 0;
+      }, { once: true });
+      vid.src = item.src;
     } else {
       div.innerHTML = `
         <img class="media-thumb" src="${item.src}" alt="${item.name}" loading="lazy">
@@ -433,11 +441,21 @@ function initAuthModal() {
           body: JSON.stringify({ username, password }),
         });
         if (resp.status === 409) {
-          setMessage('Username already exists.', 'error');
+          let errMsg = 'That username is already taken.';
+          try {
+            const errData = await resp.json();
+            if (errData && errData.error) errMsg = errData.error;
+          } catch {}
+          setMessage(errMsg, 'error');
           return;
         }
         if (!resp.ok) {
-          setMessage('Sign up failed. Try again.', 'error');
+          let errMsg = 'Sign up failed. Try again.';
+          try {
+            const errData = await resp.json();
+            if (errData && errData.error) errMsg = errData.error;
+          } catch {}
+          setMessage(errMsg, 'error');
           return;
         }
 
@@ -457,8 +475,8 @@ function initAuthModal() {
         setTimeout(() => {
           location.href = '/index.html?welcome=1';
         }, 250);
-      } catch {
-        setMessage('Sign up failed. Try again.', 'error');
+      } catch (err) {
+        setMessage('Sign up failed. Check your connection and try again.', 'error');
       }
     });
   }
