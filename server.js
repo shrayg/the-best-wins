@@ -678,11 +678,11 @@ function tierLabelFromTier(tier) {
 }
 
 function normalizeManualTier(value) {
-  if (value === undefined || value === null) return null;
+  if (value === undefined || value === null || value === 0) return null;
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
   const t = Math.floor(n);
-  if (t === 0 || t === 1 || t === 2) return t;
+  if (t === 1 || t === 2) return t;
   return null;
 }
 
@@ -1221,7 +1221,7 @@ const server = http.createServer(async (req, res) => {
         hash,
         createdAt: Date.now(),
         signupIp,
-        tier: 0,
+        tier: null,
         referralCode: null,
         referredBy: null,
         referredUsers: [],
@@ -1728,7 +1728,7 @@ const server = http.createServer(async (req, res) => {
           discordId,
           createdAt: Date.now(),
           signupIp: discordSignupIp,
-          tier: 0,
+          tier: null,
           referralCode: null,
           referredBy: null,
           referredUsers: [],
