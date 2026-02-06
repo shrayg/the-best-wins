@@ -633,6 +633,11 @@ function getAuthedUserKey(req) {
   return sess.userKey;
 }
 
+async function ensureSessionsLoaded() {
+  if (sessionsLoaded || !R2_ENABLED) return;
+  await loadSessionsOnceFromR2(usersDb || null);
+}
+
 function isValidReferralCode(code) {
   return typeof code === 'string' && new RegExp(`^[a-zA-Z0-9]{${REF_CODE_LEN}}$`).test(code);
 }
@@ -763,6 +768,7 @@ function requireAuth(req, res) {
 }
 
 async function requireAuthedUser(req, res) {
+  await ensureSessionsLoaded();
   const cookies = parseCookies(req);
   const token = cookies[SESSION_COOKIE];
   const userKey = getAuthedUserKey(req);
@@ -1391,6 +1397,7 @@ const server = http.createServer(async (req, res) => {
     if (requestUrl.pathname === '/api/me') {
       const method = (req.method || 'GET').toUpperCase();
       if (method !== 'GET' && method !== 'HEAD') return sendJson(res, 405, { error: 'Method Not Allowed' });
+      await ensureSessionsLoaded();
       const cookies = parseCookies(req);
       const token = cookies[SESSION_COOKIE];
       const userKey = getAuthedUserKey(req);
