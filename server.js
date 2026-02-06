@@ -127,6 +127,189 @@ const STATIC_ALLOWLIST = new Set([
 const imageExts = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']);
 const videoExts = new Set(['.mp4', '.webm', '.mov', '.avi', '.mkv', '.wmv', '.flv']);
 
+// ── Cloudflare R2 (S3-compatible) integration ──────────────────────────────
+const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY_ID || '';
+const R2_SECRET_KEY = process.env.R2_SECRET_ACCESS_KEY || '';
+const R2_ENDPOINT   = (process.env.R2_ENDPOINT || '').replace(/\/+$/, '');   // e.g. https://xxxx.r2.cloudflarestorage.com
+const R2_BUCKET     = process.env.R2_BUCKET || '';
+const R2_ENABLED    = !!(R2_ACCESS_KEY && R2_SECRET_KEY && R2_ENDPOINT && R2_BUCKET);
+const R2_PRESIGN_SECONDS = 600; // 10 min
+
+// AWS Signature V4 helpers (no SDK needed) ────────────────────────────────────
+function hmacSha256(key, data) {
+  return crypto.createHmac('sha256', key).update(data, 'utf8').digest();
+}
+function sha256Hex(data) {
+  return crypto.createHash('sha256').update(data, 'utf8').digest('hex');
+}
+
+/**
+ * Generate an S3-compatible presigned GET URL for an object in R2.
+ * @param {string} objectKey  e.g. "Streamer Wins/clip1.mp4"
+ * @param {number} [expiry]   seconds the URL is valid for
+ * @returns {string}          full presigned URL
+ */
+function r2PresignedUrl(objectKey, expiry = R2_PRESIGN_SECONDS) {
+  const now = new Date();
+  const datestamp = now.toISOString().replace(/[-:]/g, '').slice(0, 8);            // 20260205
+  const amzDate  = datestamp + 'T' + now.toISOString().replace(/[-:]/g, '').slice(9, 15) + 'Z'; // 20260205T…Z
+  const region   = 'auto';
+  const service  = 's3';
+  const credScope = `${datestamp}/${region}/${service}/aws4_request`;
+
+  const endpointUrl = new URL(R2_ENDPOINT);
+  const host = endpointUrl.host;
+  const encodedKey = objectKey.split('/').map(s => encodeURIComponent(s)).join('/');
+  const canonicalUri = `/${R2_BUCKET}/${encodedKey}`;
+
+  const queryParams = new Map([
+    ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
+    ['X-Amz-Credential', `${R2_ACCESS_KEY}/${credScope}`],
+    ['X-Amz-Date', amzDate],
+    ['X-Amz-Expires', String(expiry)],
+    ['X-Amz-SignedHeaders', 'host'],
+  ]);
+  const sortedQs = [...queryParams.entries()]
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&');
+
+  const canonicalRequest = [
+    'GET',
+    canonicalUri,
+    sortedQs,
+    `host:${host}\n`,
+    'host',
+    'UNSIGNED-PAYLOAD',
+  ].join('\n');
+
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credScope,
+    sha256Hex(canonicalRequest),
+  ].join('\n');
+
+  let signingKey = hmacSha256('AWS4' + R2_SECRET_KEY, datestamp);
+  signingKey = hmacSha256(signingKey, region);
+  signingKey = hmacSha256(signingKey, service);
+  signingKey = hmacSha256(signingKey, 'aws4_request');
+  const signature = hmacSha256(signingKey, stringToSign).toString('hex');
+
+  return `${endpointUrl.protocol}//${host}${canonicalUri}?${sortedQs}&X-Amz-Signature=${signature}`;
+}
+
+/**
+ * List objects in an R2 bucket under a given prefix using the S3 ListObjectsV2 API.
+ * Returns an array of object keys (strings).
+ */
+function r2ListObjects(prefix) {
+  return new Promise((resolve, reject) => {
+    const now = new Date();
+    const datestamp = now.toISOString().replace(/[-:]/g, '').slice(0, 8);
+    const amzDate = datestamp + 'T' + now.toISOString().replace(/[-:]/g, '').slice(9, 15) + 'Z';
+    const region = 'auto';
+    const service = 's3';
+    const credScope = `${datestamp}/${region}/${service}/aws4_request`;
+
+    const endpointUrl = new URL(R2_ENDPOINT);
+    const host = endpointUrl.host;
+    const canonicalUri = `/${R2_BUCKET}`;
+    const payloadHash = sha256Hex('');
+
+    const queryParams = new Map([
+      ['list-type', '2'],
+      ['prefix', prefix],
+      ['delimiter', '/'],
+    ]);
+    const sortedQs = [...queryParams.entries()]
+      .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&');
+
+    const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+    const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+
+    const canonicalRequest = [
+      'GET',
+      canonicalUri,
+      sortedQs,
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join('\n');
+
+    const stringToSign = [
+      'AWS4-HMAC-SHA256',
+      amzDate,
+      credScope,
+      sha256Hex(canonicalRequest),
+    ].join('\n');
+
+    let signingKey = hmacSha256('AWS4' + R2_SECRET_KEY, datestamp);
+    signingKey = hmacSha256(signingKey, region);
+    signingKey = hmacSha256(signingKey, service);
+    signingKey = hmacSha256(signingKey, 'aws4_request');
+    const signature = hmacSha256(signingKey, stringToSign).toString('hex');
+
+    const authHeader = `AWS4-HMAC-SHA256 Credential=${R2_ACCESS_KEY}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+    const reqOptions = {
+      hostname: host,
+      port: 443,
+      path: `${canonicalUri}?${sortedQs}`,
+      method: 'GET',
+      headers: {
+        Host: host,
+        'x-amz-date': amzDate,
+        'x-amz-content-sha256': payloadHash,
+        Authorization: authHeader,
+      },
+    };
+
+    const httpReq = https.request(reqOptions, (httpRes) => {
+      const chunks = [];
+      httpRes.on('data', (c) => chunks.push(c));
+      httpRes.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        if (httpRes.statusCode !== 200) {
+          return reject(new Error(`R2 ListObjects ${httpRes.statusCode}: ${body.slice(0, 300)}`));
+        }
+        // Parse XML response for <Key> elements
+        const keys = [];
+        const keyRegex = /<Key>([^<]+)<\/Key>/g;
+        let m;
+        while ((m = keyRegex.exec(body)) !== null) {
+          keys.push(m[1]);
+        }
+        resolve(keys);
+      });
+    });
+    httpReq.on('error', reject);
+    httpReq.end();
+  });
+}
+
+/**
+ * List media file names for a folder, from R2 if enabled, otherwise local disk.
+ */
+async function r2ListMediaFiles(folder) {
+  const folderDirName = allowedFolders.get(folder);
+  if (!folderDirName) return [];
+  const prefix = folderDirName + '/';
+  try {
+    const keys = await r2ListObjects(prefix);
+    const names = keys
+      .map((k) => k.slice(prefix.length))                 // strip prefix to get filename
+      .filter((n) => n && !n.includes('/') && isAllowedMediaFile(n));
+    names.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    return names;
+  } catch (e) {
+    console.error(`R2 list error for ${folder}:`, e && e.message ? e.message : e);
+    return [];
+  }
+}
+
 function getContentType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   switch (ext) {
@@ -716,6 +899,9 @@ function isVideoFile(fileName) {
 }
 
 async function listMediaFilesForFolder(folder) {
+  // Use R2 when configured, fall back to local disk
+  if (R2_ENABLED) return r2ListMediaFiles(folder);
+
   const folderDirName = allowedFolders.get(folder);
   if (!folderDirName) return [];
   const folderPath = path.join(MEDIA_ROOT, folderDirName);
@@ -1461,6 +1647,17 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'Invalid folder' });
       }
 
+      if (R2_ENABLED) {
+        const names = await listMediaFilesForFolder(folder);
+        const files = names.map((name) => ({
+          name,
+          type: isVideoFile(name) ? 'video' : 'image',
+          src: `/media?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(name)}`,
+        }));
+        return sendJson(res, 200, { files });
+      }
+
+      // Local-disk fallback
       const folderPath = path.join(MEDIA_ROOT, folderDirName);
       let entries;
       try {
@@ -1506,6 +1703,15 @@ const server = http.createServer(async (req, res) => {
       const names = await listMediaFilesForFolder(folder);
       const previewNames = names.slice(0, PREVIEW_LIMIT);
 
+      if (R2_ENABLED) {
+        const files = previewNames.map((name) => ({
+          name,
+          type: isVideoFile(name) ? 'video' : 'image',
+          src: `/preview-media?folder=${encodeURIComponent(folder)}&name=${encodeURIComponent(name)}`,
+        }));
+        return sendJson(res, 200, { files, limited: true, limit: PREVIEW_LIMIT });
+      }
+
       const files = [];
       for (const name of previewNames) {
         const folderDirName = allowedFolders.get(folder);
@@ -1541,6 +1747,13 @@ const server = http.createServer(async (req, res) => {
       const previewNames = new Set(names.slice(0, PREVIEW_LIMIT));
       if (!previewNames.has(name)) return sendText(res, 403, 'Forbidden');
 
+      if (R2_ENABLED) {
+        const objectKey = folderDirName + '/' + name;
+        const url = r2PresignedUrl(objectKey);
+        res.writeHead(302, { Location: url, 'Cache-Control': 'no-store' });
+        return res.end();
+      }
+
       const mediaPath = path.join(MEDIA_ROOT, folderDirName, name);
       let stat;
       try {
@@ -1568,6 +1781,13 @@ const server = http.createServer(async (req, res) => {
       }
       if (!isAllowedMediaFile(name)) {
         return sendText(res, 403, 'Forbidden');
+      }
+
+      if (R2_ENABLED) {
+        const objectKey = folderDirName + '/' + name;
+        const url = r2PresignedUrl(objectKey);
+        res.writeHead(302, { Location: url, 'Cache-Control': 'no-store' });
+        return res.end();
       }
 
       const mediaPath = path.join(MEDIA_ROOT, folderDirName, name);
@@ -1677,6 +1897,8 @@ server.listen(PORT, HOST, () => {
 
   // eslint-disable-next-line no-console
   console.log(`Storage roots: DATA_DIR=${DATA_DIR} MEDIA_ROOT=${MEDIA_ROOT}`);
+  // eslint-disable-next-line no-console
+  console.log(`R2 media storage: ${R2_ENABLED ? 'ENABLED (bucket=' + R2_BUCKET + ')' : 'DISABLED (using local disk)'}`);
 
   if (!PEPPER) {
     console.warn('\x1b[33m[WARN]\x1b[0m TBW_PEPPER is not set. Passwords are less secure without it. Add TBW_PEPPER=<random-string> to .env.');
