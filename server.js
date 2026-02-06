@@ -651,6 +651,17 @@ function findUserKeyByReferralCode(db, code) {
   return null;
 }
 
+function userExistsByUsername(db, username) {
+  if (!db || !db.users) return false;
+  const target = String(username || '').trim().toLowerCase();
+  if (!target) return false;
+  for (const [userKey, u] of Object.entries(db.users)) {
+    if (String(userKey || '').toLowerCase() === target) return true;
+    if (u && typeof u === 'object' && String(u.username || '').toLowerCase() === target) return true;
+  }
+  return false;
+}
+
 function randomReferralCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
   let out = '';
@@ -1272,7 +1283,9 @@ const server = http.createServer(async (req, res) => {
 
       const db = await ensureUsersDbFresh();
       const key = username.toLowerCase();
-      if (db.users[key]) return sendJson(res, 409, { error: 'That username is already taken' });
+      if (userExistsByUsername(db, username)) {
+        return sendJson(res, 409, { error: 'That username is already taken' });
+      }
 
       const salt = crypto.randomBytes(16).toString('hex');
       const hash = scryptHex(password, salt);
