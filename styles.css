@@ -111,8 +111,8 @@ body {
 /* Telegram icon — sits below the profile widget, not inside the dropdown */
 .profile-telegram-external {
   position: fixed;
-  top: 62px;
-  right: 16px;
+  top: 72px;
+  right: 24px;
   z-index: 9998;
   width: 40px;
   height: 40px;
@@ -1134,19 +1134,25 @@ body {
 
 /* ===== BACK BUTTON ===== */
 .back-btn {
-  position: absolute;
-  top: 30px;
-  left: 40px;
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  z-index: 5500;
   color: #c084fc;
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
-  padding: 10px 20px;
+  padding: 12px 22px;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
   border: 1px solid rgba(192, 132, 252, 0.3);
-  border-radius: 8px;
+  border-radius: 12px;
   transition: all 0.3s ease;
   background: rgba(20, 20, 40, 0.6);
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .back-btn:hover {
@@ -1670,6 +1676,13 @@ body {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
+
+  .back-btn {
+    top: 16px;
+    left: 16px;
+    font-size: 13px;
+    padding: 10px 18px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1683,5 +1696,11 @@ body {
 
   .media-grid {
     grid-template-columns: 1fr;
+  }
+
+  .back-btn {
+    top: 12px;
+    left: 12px;
+    padding: 10px 16px;
   }
 }
