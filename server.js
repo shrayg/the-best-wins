@@ -1475,6 +1475,14 @@ const server = http.createServer(async (req, res) => {
       const authed = await requireAuthedUser(req, res);
       if (!authed) return;
 
+      // TEMP: Stripe is down. Send users to Discord invite instead.
+      res.writeHead(303, {
+        Location: 'https://discord.gg/McGa3CUD',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      return res.end();
+
       const stripeSecret = process.env.STRIPE_SECRET_KEY;
       if (!stripeSecret) {
         return sendText(res, 501, 'Stripe not configured. Set STRIPE_SECRET_KEY in .env.');
