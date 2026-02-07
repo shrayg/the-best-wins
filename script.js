@@ -791,6 +791,27 @@ function initHomeReferralAndAuth() {
     const params = new URLSearchParams(location.search);
     const wantsLogin = params.get('login') === '1';
     const welcome = params.get('welcome') === '1';
+    const ipError = params.get('ip_error') === '1';
+    const vpnError = params.get('vpn_error') === '1';
+
+    if (ipError || vpnError) {
+      const alert = document.createElement('div');
+      alert.className = 'ip-error-alert';
+      alert.textContent = vpnError
+        ? 'VPN or proxy detected. Please disable it to sign up.'
+        : 'An account already exists on this IP';
+      document.body.appendChild(alert);
+      requestAnimationFrame(() => alert.classList.add('visible'));
+      setTimeout(() => {
+        alert.classList.remove('visible');
+        setTimeout(() => alert.remove(), 400);
+      }, 5000);
+      // Clean URL
+      const clean = new URL(location.href);
+      clean.searchParams.delete('ip_error');
+      clean.searchParams.delete('vpn_error');
+      history.replaceState(null, '', clean.toString());
+    }
     const ref = params.get('ref');
 
     const me = await fetchMe();

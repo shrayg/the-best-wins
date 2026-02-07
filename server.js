@@ -1145,6 +1145,30 @@ function httpsRequest(urlString, options, body) {
 /** @type {Map<string, {count:number, resetAt:number}>} */
 const signupRate = new Map();
 
+// ===== Shared signup guard: IP-duplicate + VPN check =====
+async function checkSignupBlocked(ip, db) {
+  // 1. Block if any existing user already signed up from this IP
+  for (const u of Object.values(db.users)) {
+    if (u.signupIp && u.signupIp === ip) {
+      return { blocked: true, reason: 'ip_duplicate' };
+    }
+  }
+  // 2. Block VPN / proxy users (proxycheck.io — free tier, no key needed)
+  if (ip && ip !== 'unknown' && ip !== '127.0.0.1') {
+    try {
+      const resp = await httpsRequest(`https://proxycheck.io/v2/${ip}?vpn=1`, { method: 'GET' });
+      const json = JSON.parse(resp.body.toString('utf8'));
+      if (json[ip] && (json[ip].proxy === 'yes' || json[ip].vpn === 'yes')) {
+        return { blocked: true, reason: 'vpn' };
+      }
+    } catch (e) {
+      console.error('[server] VPN check failed (allowing signup):', e.message);
+      // If the check fails, allow signup rather than blocking
+    }
+  }
+  return { blocked: false };
+}
+
 function bumpSignupRate(ip) {
   const now = Date.now();
   const windowMs = 15 * 60 * 1000; // 15 min
@@ -1503,12 +1527,14 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 409, { error: 'That username is already taken' });
       }
 
-      // Block signup if any user already has this IP
+      // Block signup if IP is duplicate or user is on VPN
       const signupIp = normalizeIp(getClientIp(req));
-      for (const u of Object.values(db.users)) {
-        if (u.signupIp && u.signupIp === signupIp) {
-          return sendJson(res, 409, { error: 'An account already exists from this IP.' });
-        }
+      const signupCheck = await checkSignupBlocked(signupIp, db);
+      if (signupCheck.blocked) {
+        const msg = signupCheck.reason === 'vpn'
+          ? 'VPN or proxy detected. Please disable it to sign up.'
+          : 'An account already exists from this IP.';
+        return sendJson(res, 409, { error: msg });
       }
 
       const salt = crypto.randomBytes(16).toString('hex');
@@ -2217,11 +2243,12 @@ const server = http.createServer(async (req, res) => {
       if (isNewDiscordUser) {
 
         const discordSignupIp = normalizeIp(getClientIp(req));
-        // Block signup if any user already has this IP
-        for (const u of Object.values(db.users)) {
-          if (u.signupIp && u.signupIp === discordSignupIp) {
-            return sendText(res, 409, 'An account already exists from this IP.');
-          }
+        const signupCheck = await checkSignupBlocked(discordSignupIp, db);
+        if (signupCheck.blocked) {
+          appendSetCookie(res, `tbw_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+          const param = signupCheck.reason === 'vpn' ? 'vpn_error=1' : 'ip_error=1';
+          res.writeHead(302, { Location: `/index.html?${param}` });
+          return res.end();
         }
         db.users[userKey] = {
           username: `discord:${discordName}`,
@@ -2377,11 +2404,12 @@ const server = http.createServer(async (req, res) => {
       const isNewGoogleUser = !db.users[userKey];
       if (isNewGoogleUser) {
         const googleSignupIp = normalizeIp(getClientIp(req));
-        // Block signup if any user already has this IP
-        for (const u of Object.values(db.users)) {
-          if (u.signupIp && u.signupIp === googleSignupIp) {
-            return sendText(res, 409, 'An account already exists from this IP.');
-          }
+        const signupCheck = await checkSignupBlocked(googleSignupIp, db);
+        if (signupCheck.blocked) {
+          appendSetCookie(res, `tbw_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+          const param = signupCheck.reason === 'vpn' ? 'vpn_error=1' : 'ip_error=1';
+          res.writeHead(302, { Location: `/index.html?${param}` });
+          return res.end();
         }
         db.users[userKey] = {
           username: `google:${googleName}`,
