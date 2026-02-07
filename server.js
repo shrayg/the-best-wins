@@ -1135,8 +1135,24 @@ function _totalUsers(db) {
   return Object.keys(db.users || {}).length;
 }
 
+let _signupTotalMonotonic = null;
+
+function _getMonotonicSignupTotal(db) {
+  const actual = _totalUsers(db);
+  if (!Number.isFinite(_signupTotalMonotonic)) {
+    _signupTotalMonotonic = actual;
+    return actual;
+  }
+  if (actual > _signupTotalMonotonic) {
+    _signupTotalMonotonic = actual;
+    return actual;
+  }
+  _signupTotalMonotonic += 1;
+  return _signupTotalMonotonic;
+}
+
 function _emitSignup(db, username, provider, referredBy) {
-  const total = _totalUsers(db);
+  const total = _getMonotonicSignupTotal(db);
   const last24h = _usersSignedUpLast24h(db);
   let referrerName = null;
   if (referredBy) {
