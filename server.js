@@ -117,7 +117,6 @@ const STATIC_ALLOWLIST = new Set([
   '/index.html',
   '/folder.html',
   '/access.html',
-  '/premium.html',
   '/preview.png',
   '/top_preview.png',
   '/face.png',
@@ -1611,7 +1610,7 @@ const server = http.createServer(async (req, res) => {
 
       const origin = getRequestOrigin(req);
       const successUrl = `${origin}/api/stripe/success?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${origin}/premium.html?canceled=1`;
+      const cancelUrl = `${origin}/index.html?premium=0&canceled=1`;
 
       const params = new URLSearchParams();
       params.set('mode', 'payment');
@@ -1669,13 +1668,13 @@ const server = http.createServer(async (req, res) => {
     if (requestUrl.pathname === '/api/stripe/success') {
       const sessionId = requestUrl.searchParams.get('session_id');
       if (!sessionId) {
-        res.writeHead(302, { Location: '/premium.html?error=missing_session' });
+        res.writeHead(302, { Location: '/index.html?premium=0&error=missing_session' });
         return res.end();
       }
 
       const stripeSecret = process.env.STRIPE_SECRET_KEY;
       if (!stripeSecret) {
-        res.writeHead(302, { Location: '/premium.html?error=not_configured' });
+        res.writeHead(302, { Location: '/index.html?premium=0&error=not_configured' });
         return res.end();
       }
 
@@ -1691,7 +1690,7 @@ const server = http.createServer(async (req, res) => {
 
       if (verifyResp.status < 200 || verifyResp.status >= 300) {
         console.error(`Stripe session verify error (${verifyResp.status}):`, verifyResp.body ? verifyResp.body.toString('utf8') : '');
-        res.writeHead(302, { Location: '/premium.html?error=verify_failed' });
+        res.writeHead(302, { Location: '/index.html?premium=0&error=verify_failed' });
         return res.end();
       }
 

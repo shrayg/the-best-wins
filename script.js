@@ -78,18 +78,36 @@ function initDisclaimer() {
 
   if (!overlay || !acceptBtn) return;
 
-  // Check if already accepted
-  if (sessionStorage.getItem('age_verified') === 'true') {
+  function hideOverlay() {
     overlay.classList.add('hidden');
     if (homepage) homepage.classList.remove('blurred');
+  }
+
+  // Check if already accepted
+  if (sessionStorage.getItem('age_verified') === 'true') {
+    hideOverlay();
     return;
   }
+
+  // If user is authed, skip the warning entirely.
+  (async () => {
+    try {
+      const resp = await fetch('/api/me', { cache: 'no-store' });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data && data.authed) {
+        hideOverlay();
+        sessionStorage.setItem('age_verified', 'true');
+      }
+    } catch {
+      // ignore
+    }
+  })();
 
   acceptBtn.addEventListener('click', () => {
     overlay.style.animation = 'fadeOut 0.3s ease forwards';
     setTimeout(() => {
-      overlay.classList.add('hidden');
-      if (homepage) homepage.classList.remove('blurred');
+      hideOverlay();
       sessionStorage.setItem('age_verified', 'true');
     }, 280);
   });
@@ -121,7 +139,8 @@ async function loadFolderFromApi(folder, grid) {
     previewCta.hidden = !visible;
   };
 
-  setPreviewCta(false);
+  // Always show the CTA banner on folder pages, even when authed.
+  setPreviewCta(true);
 
   grid.innerHTML = `
     <div style="grid-column: 1/-1; text-align: center; padding: 50px 20px; color: #666;">
@@ -175,12 +194,12 @@ async function loadFolderFromApi(folder, grid) {
           <h3 style="color: #999; margin-bottom: 10px;">No files found</h3>
           <p>Add images or videos to the "${folder}" folder</p>
         </div>`;
-      setPreviewCta(false);
+      setPreviewCta(true);
       return;
     }
 
     renderMediaGrid(grid, files);
-    setPreviewCta(false);
+    setPreviewCta(true);
   } catch (err) {
     grid.innerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 60px 20px; color: #666;">
@@ -192,7 +211,7 @@ async function loadFolderFromApi(folder, grid) {
         </p>
         <p style="font-size: 13px; margin-top: 12px; color: #777;">Command: <strong>node server.js</strong></p>
       </div>`;
-    setPreviewCta(false);
+    setPreviewCta(true);
   }
 }
 
@@ -862,6 +881,7 @@ function initProfileMenu() {
     try {
       await fetch('/api/logout', { method: 'POST' });
     } finally {
+      sessionStorage.removeItem('age_verified');
       setOpen(false);
       root.hidden = true;
       if (telegramExt) telegramExt.hidden = true;
