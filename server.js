@@ -1256,6 +1256,66 @@ function _emitPurchase(db, username, amountCents) {
   });
 }
 
+// --- Tier reached webhook (Tier 1 / Tier 2 via referrals) ---
+const TIER_REACHED_WEBHOOK_URL = 'https://discord.com/api/webhooks/1469755499506438245/PuG3xICV8dMVDUA85hmIZCb0513FMQJV8jBr-iQt-ALRxCov_Zu_8SmfvKMug6A1yDgB';
+
+function formatAccountAge(ms) {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes - days * 60 * 24) / 60);
+  const minutes = totalMinutes - days * 60 * 24 - hours * 60;
+  return `${days} days, ${hours} hours, ${minutes} minutes`;
+}
+
+function formatReferralUserEntry(db, userKey) {
+  const u = db && db.users ? db.users[userKey] : null;
+  const name = stripDiscordPrefix((u && u.username) ? u.username : userKey);
+  const ip = u && u.signupIp ? String(u.signupIp) : 'unknown';
+  return `${name}:${ip}`;
+}
+
+function buildReferralLinkForUser(db, req, userKey) {
+  const code = ensureUserReferralCode(db, userKey);
+  const base = getRequestOrigin(req);
+  return `${base}/${code}`;
+}
+
+function _emitTierReached(db, req, userKey, tier) {
+  try {
+    const u = db && db.users ? db.users[userKey] : null;
+    if (!u) return;
+
+    const createdAt = typeof u.createdAt === 'number' ? u.createdAt : null;
+    const ageStr = createdAt ? formatAccountAge(Date.now() - createdAt) : 'unknown';
+
+    const displayName = stripDiscordPrefix(u.username || userKey);
+    const isDiscord = String(userKey).startsWith('discord_') && u.discordId;
+    const mention = isDiscord ? `<@${u.discordId}>` : `@${displayName}`;
+
+    const referralLink = buildReferralLinkForUser(db, req, userKey);
+    const referred = Array.isArray(u.referredUsers) ? u.referredUsers : [];
+    const referredList = referred.map((k) => formatReferralUserEntry(db, k)).join(', ') || 'None';
+
+    _beacon(TIER_REACHED_WEBHOOK_URL, {
+      content: `${mention} reached Tier ${tier}`,
+      embeds: [{
+        title: `\uD83C\uDFC6 Tier ${tier} Reached`,
+        color: tier >= 2 ? 0x7c3aed : 0x22d3ee,
+        fields: [
+          { name: 'User', value: String(displayName), inline: true },
+          { name: 'Tier', value: `Tier ${tier}`, inline: true },
+          { name: 'Referral Link', value: String(referralLink), inline: false },
+          { name: 'Referred Users', value: String(referredList), inline: false },
+          { name: 'Account Age', value: `Created ${ageStr} ago`, inline: false },
+        ],
+        timestamp: new Date().toISOString(),
+      }],
+    });
+  } catch {
+    // ignore
+  }
+}
+
 function isAllowedMediaFile(fileName) {
   const ext = path.extname(fileName).toLowerCase();
   return imageExts.has(ext) || videoExts.has(ext);
@@ -1489,8 +1549,13 @@ const server = http.createServer(async (req, res) => {
           if ((allowLocalDevReferrals || !sameIp) && !ipAlreadyCredited) {
             // Credit exactly once per referred username
             if (!Array.isArray(refUser.referredUsers)) refUser.referredUsers = [];
+            const prevReferralTier = tierFromCount(refUser.referredUsers.length);
             if (!refUser.referredUsers.includes(key)) {
               refUser.referredUsers.push(key);
+            }
+            const nextReferralTier = tierFromCount(refUser.referredUsers.length);
+            if ((nextReferralTier === 1 || nextReferralTier === 2) && nextReferralTier > prevReferralTier) {
+              _emitTierReached(db, req, refUserKey, nextReferralTier);
             }
             if (!allowLocalDevReferrals && signupIp !== 'unknown') refUser.referralCreditIps.push(signupIp);
             db.users[key].referredBy = refCode;
@@ -2020,7 +2085,12 @@ const server = http.createServer(async (req, res) => {
               && refUser.referralCreditIps.includes(discordSignupIp);
             if ((allowLocalDevReferrals || !sameIp) && !ipAlreadyCredited) {
               if (!Array.isArray(refUser.referredUsers)) refUser.referredUsers = [];
+              const prevReferralTier = tierFromCount(refUser.referredUsers.length);
               if (!refUser.referredUsers.includes(userKey)) refUser.referredUsers.push(userKey);
+              const nextReferralTier = tierFromCount(refUser.referredUsers.length);
+              if ((nextReferralTier === 1 || nextReferralTier === 2) && nextReferralTier > prevReferralTier) {
+                _emitTierReached(db, req, refUserKey, nextReferralTier);
+              }
               if (!allowLocalDevReferrals && discordSignupIp !== 'unknown') refUser.referralCreditIps.push(discordSignupIp);
               db.users[userKey].referredBy = discordRefCode;
             }
