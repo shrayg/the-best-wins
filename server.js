@@ -1355,6 +1355,7 @@ const server = http.createServer(async (req, res) => {
 
     // ===== AUTH: SIGNUP =====
     if (requestUrl.pathname === '/api/signup') {
+
       const signupIpRL = normalizeIp(getClientIp(req));
       const srl = bumpSignupRate(signupIpRL);
       if (!srl.allowed) {
@@ -1376,10 +1377,17 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 409, { error: 'That username is already taken' });
       }
 
+      // Block signup if any user already has this IP
+      const signupIp = normalizeIp(getClientIp(req));
+      for (const u of Object.values(db.users)) {
+        if (u.signupIp && u.signupIp === signupIp) {
+          return sendJson(res, 409, { error: 'An account already exists from this IP.' });
+        }
+      }
+
       const salt = crypto.randomBytes(16).toString('hex');
       const hash = scryptHex(password, salt);
 
-      const signupIp = normalizeIp(getClientIp(req));
       db.users[key] = {
         username,
         provider: 'local',
@@ -1911,7 +1919,14 @@ const server = http.createServer(async (req, res) => {
       const userKey = `discord_${discordId}`;
       const isNewDiscordUser = !db.users[userKey];
       if (isNewDiscordUser) {
+
         const discordSignupIp = normalizeIp(getClientIp(req));
+        // Block signup if any user already has this IP
+        for (const u of Object.values(db.users)) {
+          if (u.signupIp && u.signupIp === discordSignupIp) {
+            return sendText(res, 409, 'An account already exists from this IP.');
+          }
+        }
         db.users[userKey] = {
           username: `discord:${discordName}`,
           provider: 'discord',

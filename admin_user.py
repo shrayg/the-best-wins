@@ -160,6 +160,7 @@ def main():
             continue
 
         u = users[found_key]
+
         refs = u.get("referredUsers") or []
         created = u.get("createdAt")
         created_str = datetime.datetime.utcfromtimestamp(created / 1000).strftime("%Y-%m-%d %H:%M UTC") if created else "N/A"
@@ -174,6 +175,9 @@ def main():
         print(f"  Signup IP:      {u.get('signupIp', 'N/A')}")
         print(f"  Created:        {created_str}")
         print(f"  Premium:        {u.get('premiumProvider') or 'None'}")
+        print("\n  Referral Credit IPs:")
+        for ip in (u.get('referralCreditIps') or []):
+            print(f"    - {ip}")
         print()
 
         change = input("  Change Tier? (y/n): ").strip().lower()
