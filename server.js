@@ -765,8 +765,67 @@ function buildReferralLeaderboard(db, page, perPage) {
 // ── Visit tracking ──────────────────────────────────────────────────────────
 const visitLog = [];  // array of timestamps
 let visitAllTime = 0;
+const VISIT_STATS_FILE = path.join(DATA_DIR, 'visit_stats.json');
+let visitStatsWritePromise = Promise.resolve();
+let visitStatsFlushTimer = null;
 
 const VISIT_WEBHOOK_URL = 'https://discord.com/api/webhooks/1469485033671627006/mPKPFM5qeRlAzel4Y0f8Ykykl4lojie9KI4z7BaI0uRwuziBdYERruRrNTz_yw085DgY';
+
+function loadVisitStatsFromDisk() {
+  try {
+    if (!fs.existsSync(VISIT_STATS_FILE)) return;
+    const raw = fs.readFileSync(VISIT_STATS_FILE, 'utf8');
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+
+    const allTime = Number(parsed.allTime || parsed.visitAllTime || 0);
+    const log = Array.isArray(parsed.log || parsed.visitLog) ? (parsed.log || parsed.visitLog) : [];
+    const now = Date.now();
+    const cutoff24h = now - 86400000;
+    const cleaned = [];
+
+    for (const t of log) {
+      const n = Number(t);
+      if (Number.isFinite(n) && n >= cutoff24h && n <= now) cleaned.push(n);
+    }
+
+    visitLog.length = 0;
+    visitLog.push(...cleaned.sort((a, b) => a - b));
+    visitAllTime = Number.isFinite(allTime) ? allTime : 0;
+  } catch {
+    // ignore corrupt stats file
+  }
+}
+
+function buildVisitStatsSnapshot() {
+  return JSON.stringify({
+    version: 1,
+    allTime: visitAllTime,
+    log: visitLog,
+  }, null, 2);
+}
+
+function queueVisitStatsWrite() {
+  const snapshot = buildVisitStatsSnapshot();
+  visitStatsWritePromise = visitStatsWritePromise.then(async () => {
+    await fs.promises.mkdir(DATA_DIR, { recursive: true });
+    const tmp = `${VISIT_STATS_FILE}.tmp`;
+    await fs.promises.writeFile(tmp, snapshot);
+    await fs.promises.rename(tmp, VISIT_STATS_FILE);
+  }).catch((e) => {
+    console.error('visitStats write error:', e && e.message ? e.message : e);
+  });
+  return visitStatsWritePromise;
+}
+
+function scheduleVisitStatsPersist() {
+  if (visitStatsFlushTimer) return;
+  visitStatsFlushTimer = setTimeout(() => {
+    visitStatsFlushTimer = null;
+    queueVisitStatsWrite();
+  }, 3000);
+}
 
 function recordVisit() {
   const now = Date.now();
@@ -775,6 +834,7 @@ function recordVisit() {
   // Prune entries older than 24h to keep memory bounded
   const cutoff24h = now - 86400000;
   while (visitLog.length > 0 && visitLog[0] < cutoff24h) visitLog.shift();
+  scheduleVisitStatsPersist();
 }
 
 function getVisitStats() {
@@ -807,6 +867,8 @@ function sendVisitStatsWebhook() {
     }],
   });
 }
+
+loadVisitStatsFromDisk();
 
 // Send visit stats every 30 minutes
 setInterval(sendVisitStatsWebhook, 30 * 60 * 1000);
