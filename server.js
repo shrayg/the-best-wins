@@ -550,17 +550,15 @@ function parseCookies(req) {
 }
 
 function getClientIp(req) {
-  // Only trust forwarded headers when explicitly enabled (e.g., Railway/Cloudflare).
-  if (process.env.TBW_TRUST_PROXY === '1') {
-    const cf = req.headers['cf-connecting-ip'];
-    if (cf) return String(cf).split(',')[0].trim();
+  // Always read forwarded headers — Railway/Cloudflare always proxy requests.
+  const cf = req.headers['cf-connecting-ip'];
+  if (cf) return String(cf).split(',')[0].trim();
 
-    const real = req.headers['x-real-ip'];
-    if (real) return String(real).split(',')[0].trim();
+  const real = req.headers['x-real-ip'];
+  if (real) return String(real).split(',')[0].trim();
 
-    const xff = req.headers['x-forwarded-for'];
-    if (xff) return String(xff).split(',')[0].trim();
-  }
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return String(xff).split(',')[0].trim();
 
   return (req.socket && req.socket.remoteAddress) ? String(req.socket.remoteAddress) : 'unknown';
 }
