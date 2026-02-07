@@ -997,6 +997,7 @@ body {
 
 .premium-buywrap {
   margin-top: 18px;
+  margin-bottom: 24px;
 }
 
 .premium-buy {
@@ -1012,7 +1013,7 @@ body {
   box-shadow: 0 18px 70px rgba(0, 0, 0, 0.35);
   transition: transform 0.2s ease, filter 0.2s ease;
   font-size: 14px;
-  min-width: 320px;
+  min-width: min(520px, 90vw);
   text-align: center;
 }
 
