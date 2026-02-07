@@ -57,11 +57,44 @@
 
     <!-- Preview CTA (shown only in preview mode) -->
     <div class="cta-banner" id="preview-cta" hidden>
-      <a href="/index.html?login=1">Get Free Access To 3k+ Videos</a>
+      <a href="#" data-ref-open="1">Get Free Access To 3k+ Videos</a>
     </div>
   </div>
 
   <!-- Lightbox container added by JS -->
+
+  <!-- Referral Tutorial Popup -->
+  <div class="referral-overlay" id="referral-overlay" aria-hidden="true">
+    <div class="referral-modal" role="dialog" aria-modal="true" aria-labelledby="referral-title">
+      <button class="referral-close" id="referral-close" type="button" aria-label="Close">&times;</button>
+
+      <h2 id="referral-title">Hello, <span id="referral-hello-name">USER</span>.</h2>
+      <p class="referral-sub">You will unlock free access in just a few moments. Here's how:</p>
+
+      <p class="referral-body">Copy the link and invite people. You get access to more videos when people join.</p>
+
+      <p class="referral-body">
+        Post your link in <a class="referral-reddit" href="https://www.reddit.com/r/SurprisedByCock/" target="_blank" rel="noopener noreferrer">This Reddit</a> under posts and replies.
+      </p>
+
+      <p class="referral-body">You can also invite your friends from Discord &amp; Telegram. Progress on bottom of page.</p>
+
+      <div class="referral-linkbox">
+        <div class="referral-linklabel">Here's your referral link:</div>
+        <div class="referral-linkrow">
+          <input id="referral-link" class="referral-link" readonly value="" placeholder="Loading your link…" />
+          <button class="referral-copy" id="referral-copy" type="button">Copy</button>
+        </div>
+        <div class="referral-tierhint">
+          <div class="hint-line">TIER 1 = 1 SIGNUP</div>
+          <div class="hint-line">TIER 2 = 4 SIGNUPS</div>
+        </div>
+
+        <a class="referral-premium-btn" href="https://discord.gg/NCCSJKgh">Click To Get Instant Full Access</a>
+        <div class="referral-copied" id="referral-copied" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- Mega Link Popup (Tier 1+) -->
   <div class="mega-overlay" id="mega-overlay" aria-hidden="true">

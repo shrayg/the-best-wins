@@ -635,6 +635,8 @@ function initHomeReferralAndAuth() {
   const refCopyBtn = document.getElementById('referral-copy');
   const refCopiedEl = document.getElementById('referral-copied');
 
+  const refOpenTriggers = Array.from(document.querySelectorAll('[data-ref-open]'));
+
   const authOverlay = document.getElementById('auth-overlay');
 
   // Not on home page.
@@ -679,17 +681,17 @@ function initHomeReferralAndAuth() {
   }
 
   async function refreshReferralUi() {
-    if (!referralFooter) return;
+    if (!referralFooter && !refOverlay) return;
 
     const me = await fetchMe();
     const authed = !!(me && me.authed);
     if (!authed) {
-      referralFooter.hidden = true;
+      if (referralFooter) referralFooter.hidden = true;
       if (homeLoginBtn) homeLoginBtn.hidden = false;
       return;
     }
     if (homeLoginBtn) homeLoginBtn.hidden = true;
-    referralFooter.hidden = false;
+    if (referralFooter) referralFooter.hidden = false;
     if (refHelloName) refHelloName.textContent = String(me.username || 'USER').toUpperCase();
 
     try {
@@ -743,6 +745,16 @@ function initHomeReferralAndAuth() {
     tutorialBtn.addEventListener('click', () => {
       setOverlayOpen(true);
     });
+  }
+  if (refOpenTriggers.length) {
+    refOpenTriggers.forEach((btn) => btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const me = await fetchMe();
+      const authed = !!(me && me.authed);
+      if (!authed && authOverlay) return openAuthModal('login');
+      setOverlayOpen(true);
+      refreshReferralUi();
+    }));
   }
   if (refClose) refClose.addEventListener('click', () => setOverlayOpen(false));
   if (refOverlay) {
