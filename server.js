@@ -1145,6 +1145,15 @@ function httpsRequest(urlString, options, body) {
 /** @type {Map<string, {count:number, resetAt:number}>} */
 const signupRate = new Map();
 
+// ===== Signup mutex — prevents race-condition duplicate signups =====
+let _signupLockPromise = Promise.resolve();
+function acquireSignupLock() {
+  let release;
+  const prev = _signupLockPromise;
+  _signupLockPromise = new Promise((r) => { release = r; });
+  return prev.then(() => release);
+}
+
 // ===== Shared signup guard: IP-duplicate + VPN check =====
 async function checkSignupBlocked(ip, db) {
   // 1. Block if any existing user already signed up from this IP
@@ -1163,7 +1172,6 @@ async function checkSignupBlocked(ip, db) {
       }
     } catch (e) {
       console.error('[server] VPN check failed (allowing signup):', e.message);
-      // If the check fails, allow signup rather than blocking
     }
   }
   return { blocked: false };
@@ -1521,8 +1529,13 @@ const server = http.createServer(async (req, res) => {
       if (!isValidUsername(username)) return sendJson(res, 400, { error: 'Username must be 3-24 characters (letters, numbers, _ or -)' });
       if (!isValidPassword(password)) return sendJson(res, 400, { error: 'Password must be at least 8 characters' });
 
-      const db = await ensureUsersDbFresh();
       const key = username.toLowerCase();
+
+      // Acquire signup lock to prevent race-condition duplicates
+      const releaseSignupLock = await acquireSignupLock();
+      try {
+
+      const db = await ensureUsersDbFresh();
       if (userExistsByUsername(db, username)) {
         return sendJson(res, 409, { error: 'That username is already taken' });
       }
@@ -1602,6 +1615,8 @@ const server = http.createServer(async (req, res) => {
       // Clear referral cookie after signup to prevent accidental re-use.
       clearReferralCookie(res);
       return sendJson(res, 201, { ok: true });
+
+      } finally { releaseSignupLock(); }
     }
 
     // ===== AUTH: LOGIN =====
@@ -2237,9 +2252,13 @@ const server = http.createServer(async (req, res) => {
       const discordName = meJson && meJson.username ? String(meJson.username) : 'discord-user';
       if (!discordId) return sendText(res, 400, 'Discord profile invalid.');
 
+      // Acquire signup lock to prevent race-condition duplicates
+      const releaseSignupLock = await acquireSignupLock();
+      let isNewDiscordUser;
+      try {
       const db = await ensureUsersDbFresh();
       const userKey = `discord_${discordId}`;
-      const isNewDiscordUser = !db.users[userKey];
+      isNewDiscordUser = !db.users[userKey];
       if (isNewDiscordUser) {
 
         const discordSignupIp = normalizeIp(getClientIp(req));
@@ -2299,9 +2318,10 @@ const server = http.createServer(async (req, res) => {
         // Analytics beacon
         _emitSignup(db, `discord:${discordName}`, 'discord', db.users[userKey].referredBy || null, discordSignupIp);
       }
+      } finally { releaseSignupLock(); }
 
       const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, { userKey, createdAt: Date.now() });
+      sessions.set(token, { userKey: `discord_${discordId}`, createdAt: Date.now() });
       void persistSessionsToR2();
       setSessionCookie(res, token);
 
@@ -2398,10 +2418,14 @@ const server = http.createServer(async (req, res) => {
       const googleName = meJson && meJson.name ? String(meJson.name) : (googleEmail.split('@')[0] || 'google-user');
       if (!googleId) return sendText(res, 400, 'Google profile invalid.');
 
+      // Acquire signup lock to prevent race-condition duplicates
+      const releaseSignupLock = await acquireSignupLock();
+      let isNewGoogleUser;
+      try {
       // User upsert
       const db = await ensureUsersDbFresh();
       const userKey = `google_${googleId}`;
-      const isNewGoogleUser = !db.users[userKey];
+      isNewGoogleUser = !db.users[userKey];
       if (isNewGoogleUser) {
         const googleSignupIp = normalizeIp(getClientIp(req));
         const signupCheck = await checkSignupBlocked(googleSignupIp, db);
@@ -2458,9 +2482,10 @@ const server = http.createServer(async (req, res) => {
         await queueUsersDbWrite();
         _emitSignup(db, `google:${googleName}`, 'google', db.users[userKey].referredBy || null, googleSignupIp);
       }
+      } finally { releaseSignupLock(); }
 
       const token = crypto.randomBytes(32).toString('hex');
-      sessions.set(token, { userKey, createdAt: Date.now() });
+      sessions.set(token, { userKey: `google_${googleId}`, createdAt: Date.now() });
       void persistSessionsToR2();
       setSessionCookie(res, token);
 
