@@ -520,6 +520,10 @@ function initAuthModal() {
         window.location.href = '/auth/discord';
         return;
       }
+      if (provider === 'google') {
+        window.location.href = '/auth/google';
+        return;
+      }
       setMessage('Unknown provider.', 'error');
     });
   });
