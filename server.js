@@ -2287,6 +2287,163 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
 
+    // ===== GOOGLE OAUTH =====
+    if (requestUrl.pathname === '/auth/google') {
+      const clientId = process.env.GOOGLE_CLIENT_ID || '1041218108977-2mfvfjjb7ejsvk68vtcfgfpbimibhpla.apps.googleusercontent.com';
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || (getRequestOrigin(req) + '/auth/google/callback');
+      if (!clientId) {
+        return sendText(res, 501, 'Google login not configured.');
+      }
+
+      const state = crypto.randomBytes(16).toString('hex');
+      appendSetCookie(res, `tbw_oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`);
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        state,
+        access_type: 'offline',
+        prompt: 'consent',
+      });
+      res.writeHead(302, { Location: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}` });
+      return res.end();
+    }
+
+    if (requestUrl.pathname === '/auth/google/callback') {
+      const code = requestUrl.searchParams.get('code');
+      const state = requestUrl.searchParams.get('state');
+      const cookies = parseCookies(req);
+      if (!code || !state || !cookies.tbw_oauth_state || cookies.tbw_oauth_state !== state) {
+        return sendText(res, 400, 'Invalid OAuth state. Clear site cookies and retry the Google login flow.');
+      }
+
+      const clientId = process.env.GOOGLE_CLIENT_ID || '1041218108977-2mfvfjjb7ejsvk68vtcfgfpbimibhpla.apps.googleusercontent.com';
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET || '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';
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || (getRequestOrigin(req) + '/auth/google/callback');
+      if (!clientId || !clientSecret) {
+        return sendText(res, 501, 'Google login not configured.');
+      }
+
+      // Exchange code for tokens
+      const tokenBody = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+      }).toString();
+
+      const tokenResp = await httpsRequest('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(tokenBody),
+        },
+      }, tokenBody);
+
+      if (tokenResp.status < 200 || tokenResp.status >= 300) {
+        console.error('[server] Google token exchange failed:', tokenResp.body.toString('utf8'));
+        return sendText(res, 400, 'Google token exchange failed.');
+      }
+
+      let tokenJson;
+      try { tokenJson = JSON.parse(tokenResp.body.toString('utf8')); } catch { tokenJson = null; }
+      const accessToken = tokenJson && tokenJson.access_token;
+      if (!accessToken) return sendText(res, 400, 'Google token exchange failed.');
+
+      // Fetch Google profile
+      const meResp = await httpsRequest('https://www.googleapis.com/oauth2/v2/userinfo', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (meResp.status < 200 || meResp.status >= 300) {
+        return sendText(res, 400, 'Google profile fetch failed.');
+      }
+
+      let meJson;
+      try { meJson = JSON.parse(meResp.body.toString('utf8')); } catch { meJson = null; }
+
+      const googleId = meJson && meJson.id ? String(meJson.id) : null;
+      const googleEmail = meJson && meJson.email ? String(meJson.email) : '';
+      const googleName = meJson && meJson.name ? String(meJson.name) : (googleEmail.split('@')[0] || 'google-user');
+      if (!googleId) return sendText(res, 400, 'Google profile invalid.');
+
+      // User upsert
+      const db = await ensureUsersDbFresh();
+      const userKey = `google_${googleId}`;
+      const isNewGoogleUser = !db.users[userKey];
+      if (isNewGoogleUser) {
+        const googleSignupIp = normalizeIp(getClientIp(req));
+        // Block signup if any user already has this IP
+        for (const u of Object.values(db.users)) {
+          if (u.signupIp && u.signupIp === googleSignupIp) {
+            return sendText(res, 409, 'An account already exists from this IP.');
+          }
+        }
+        db.users[userKey] = {
+          username: `google:${googleName}`,
+          provider: 'google',
+          googleId,
+          googleEmail,
+          createdAt: Date.now(),
+          signupIp: googleSignupIp,
+          tier: null,
+          referralCode: null,
+          referredBy: null,
+          referredUsers: [],
+        };
+
+        ensureUserReferralCode(db, userKey);
+
+        // Referral attribution from cookie
+        const googleCookies = parseCookies(req);
+        const googleRefCode = googleCookies[REF_COOKIE];
+        if (isValidReferralCode(googleRefCode)) {
+          const refUserKey = findUserKeyByReferralCode(db, googleRefCode);
+          if (refUserKey && refUserKey !== userKey) {
+            const refUser = db.users[refUserKey];
+            const refIp = normalizeIp(refUser && refUser.signupIp);
+            const sameIp = refIp !== 'unknown' && googleSignupIp !== 'unknown' && refIp === googleSignupIp;
+            const allowLocalDevReferrals = process.env.TBW_DEV_ALLOW_SAME_IP_REFERRALS === '1'
+              && googleSignupIp === '127.0.0.1' && refIp === '127.0.0.1';
+            if (!Array.isArray(refUser.referralCreditIps)) refUser.referralCreditIps = [];
+            const ipAlreadyCredited = !allowLocalDevReferrals
+              && googleSignupIp !== 'unknown'
+              && refUser.referralCreditIps.includes(googleSignupIp);
+            if ((allowLocalDevReferrals || !sameIp) && !ipAlreadyCredited) {
+              if (!Array.isArray(refUser.referredUsers)) refUser.referredUsers = [];
+              const prevReferralTier = tierFromCount(refUser.referredUsers.length);
+              if (!refUser.referredUsers.includes(userKey)) refUser.referredUsers.push(userKey);
+              const nextReferralTier = tierFromCount(refUser.referredUsers.length);
+              if ((nextReferralTier === 1 || nextReferralTier === 2) && nextReferralTier > prevReferralTier) {
+                _emitTierReached(db, req, refUserKey, nextReferralTier);
+              }
+              if (!allowLocalDevReferrals && googleSignupIp !== 'unknown') refUser.referralCreditIps.push(googleSignupIp);
+              db.users[userKey].referredBy = googleRefCode;
+            }
+          }
+        }
+
+        await queueUsersDbWrite();
+        _emitSignup(db, `google:${googleName}`, 'google', db.users[userKey].referredBy || null, googleSignupIp);
+      }
+
+      const token = crypto.randomBytes(32).toString('hex');
+      sessions.set(token, { userKey, createdAt: Date.now() });
+      void persistSessionsToR2();
+      setSessionCookie(res, token);
+
+      if (isNewGoogleUser) clearReferralCookie(res);
+
+      // clear state cookie
+      appendSetCookie(res, `tbw_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+      res.writeHead(302, { Location: '/index.html?welcome=1' });
+      return res.end();
+    }
+
     // API: list files in a category folder
     if (requestUrl.pathname === '/api/list') {
       if (!await requireAuthedUser(req, res)) return;

@@ -1922,6 +1922,7 @@ body {
 }
 
 .social-btn.discord { border-top: 3px solid #5865F2; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.social-btn.google { border-top: 3px solid #4285F4; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .social-btn.telegram { border-top: 3px solid #2AABEE; }
 
 .social-icon-svg {
@@ -1929,6 +1930,9 @@ body {
   height: 20px;
   fill: #5865F2;
   flex-shrink: 0;
+}
+.social-icon-svg.google-icon {
+  fill: none;
 }
 
 .tier-link:focus-visible .tier-card {
