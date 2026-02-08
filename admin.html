@@ -585,7 +585,7 @@ async function loadSignups(){
   const r=await fetch('/admin/api/signups');const d=await r.json();
   $('#signup-count').textContent=d.signups.length;
   const body=$('#signups-body');
-  if(!d.signups.length){body.innerHTML='<tr class="empty-row"><td colspan="5">No signups recorded since restart</td></tr>';return}
+  if(!d.signups.length){body.innerHTML='<tr class="empty-row"><td colspan="5">No signups recorded yet</td></tr>';return}
   body.innerHTML=d.signups.map(s=>`<tr>
     <td><span class="js-ago" data-ts="${Number(s.ts)||0}">${timeAgo(s.ts)}</span></td>
     <td><strong>${displayUsername(s.username)}</strong></td>

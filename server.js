@@ -1538,15 +1538,57 @@ async function ensureUsersDbFresh() {
 }
 
 async function queueUsersDbWrite() {
-  const snapshot = JSON.stringify(usersDb, null, 2);
   usersDbWritePromise = usersDbWritePromise.then(async () => {
     if (R2_ENABLED) {
-      // Write to R2
+      // Merge-then-write to reduce multi-instance overwrite loss.
+      let remoteDb = null;
+      try {
+        const raw = await r2GetObject('data/users.json');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') remoteDb = parsed;
+        }
+      } catch {
+        remoteDb = null;
+      }
+
+      const merged = { version: 1, users: {} };
+      const remoteUsers = remoteDb && remoteDb.users && typeof remoteDb.users === 'object' ? remoteDb.users : {};
+      const localUsers = usersDb && usersDb.users && typeof usersDb.users === 'object' ? usersDb.users : {};
+      merged.version = Math.max(
+        (remoteDb && typeof remoteDb.version === 'number' ? remoteDb.version : 1),
+        (usersDb && typeof usersDb.version === 'number' ? usersDb.version : 1)
+      );
+
+      // Start with remote, overlay local.
+      merged.users = { ...remoteUsers };
+      for (const [k, localU] of Object.entries(localUsers)) {
+        const remoteU = merged.users[k];
+        if (!remoteU || typeof remoteU !== 'object' || !localU || typeof localU !== 'object') {
+          merged.users[k] = localU;
+          continue;
+        }
+
+        const next = { ...remoteU, ...localU };
+
+        // Union common array fields to avoid losing concurrent appends.
+        for (const field of ['referredUsers', 'referralCreditIps']) {
+          const a = Array.isArray(remoteU[field]) ? remoteU[field] : [];
+          const b = Array.isArray(localU[field]) ? localU[field] : [];
+          if (a.length || b.length) next[field] = Array.from(new Set([...a, ...b]));
+        }
+
+        merged.users[k] = next;
+      }
+
+      usersDb = merged;
+      const snapshot = JSON.stringify(merged, null, 2);
       await r2PutObject('data/users.json', snapshot, 'application/json');
     } else {
       // Write to local disk
       await fs.promises.mkdir(DATA_DIR, { recursive: true });
       const tmp = `${USERS_FILE}.tmp`;
+      const snapshot = JSON.stringify(usersDb, null, 2);
       await fs.promises.writeFile(tmp, snapshot);
       await fs.promises.rename(tmp, USERS_FILE);
     }
@@ -2020,7 +2062,18 @@ const server = http.createServer(async (req, res) => {
 
       // Recent signups
       if (requestUrl.pathname === '/admin/api/signups') {
-        return sendJson(res, 200, { signups: adminSignupLog.slice().reverse() });
+        const db = await ensureUsersDbFresh();
+        const signups = Object.entries(db.users || {}).map(([key, u]) => {
+          const createdAt = u && typeof u.createdAt === 'number' ? u.createdAt : 0;
+          return {
+            ts: createdAt,
+            username: u && u.username ? String(u.username) : key,
+            provider: u && u.provider ? String(u.provider) : 'local',
+            ip: u && u.signupIp ? String(u.signupIp) : 'unknown',
+            referredBy: u && u.referredBy ? String(u.referredBy) : null,
+          };
+        }).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+        return sendJson(res, 200, { signups });
       }
 
       // Recent payments
