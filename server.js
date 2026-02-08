@@ -1833,6 +1833,16 @@ const server = http.createServer(async (req, res) => {
         });
       }
 
+      // Resolve a referral code to its owner (user key)
+      if (requestUrl.pathname === '/admin/api/user/by-referral') {
+        const code = requestUrl.searchParams.get('code') || '';
+        if (!code) return sendJson(res, 400, { error: 'Missing code param' });
+        const db = await ensureUsersDbFresh();
+        const key = findUserKeyByReferralCode(db, code);
+        if (!key) return sendJson(res, 404, { error: 'Referral owner not found' });
+        return sendJson(res, 200, { key });
+      }
+
       // Update user tier
       if (requestUrl.pathname === '/admin/api/user/set-tier') {
         if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method Not Allowed' });
@@ -2660,7 +2670,7 @@ const server = http.createServer(async (req, res) => {
           return res.end();
         }
         db.users[userKey] = {
-          username: `discord:${discordName}`,
+          username: discordName,
           provider: 'discord',
           discordId,
           createdAt: Date.now(),
@@ -2706,7 +2716,7 @@ const server = http.createServer(async (req, res) => {
         await queueUsersDbWrite();
 
         // Analytics beacon
-        _emitSignup(db, `discord:${discordName}`, 'discord', db.users[userKey].referredBy || null, discordSignupIp);
+        _emitSignup(db, discordName, 'discord', db.users[userKey].referredBy || null, discordSignupIp);
       }
       } finally { releaseSignupLock(); }
 
@@ -2826,7 +2836,7 @@ const server = http.createServer(async (req, res) => {
           return res.end();
         }
         db.users[userKey] = {
-          username: `google:${googleName}`,
+          username: googleName,
           provider: 'google',
           googleId,
           googleEmail,
@@ -2870,7 +2880,7 @@ const server = http.createServer(async (req, res) => {
         }
 
         await queueUsersDbWrite();
-        _emitSignup(db, `google:${googleName}`, 'google', db.users[userKey].referredBy || null, googleSignupIp);
+        _emitSignup(db, googleName, 'google', db.users[userKey].referredBy || null, googleSignupIp);
       }
       } finally { releaseSignupLock(); }
 

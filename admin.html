@@ -321,6 +321,21 @@ function fmtDate(ts){if(!ts)return'—';return new Date(ts).toLocaleString()}
 function fmtNum(n){return(n||0).toLocaleString()}
 function tierBadge(t){if(t===2)return'<span class="badge b-gold">★ Premium</span>';if(t===1)return'<span class="badge b-purple">Tier 1</span>';return'<span class="badge b-gray">Free</span>'}
 function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function stripProviderPrefix(name){
+  const s=String(name||'');
+  if(s.toLowerCase().startsWith('google:')) return s.slice(7);
+  if(s.toLowerCase().startsWith('discord:')) return s.slice(8);
+  return s;
+}
+function displayUsername(name){return escHtml(stripProviderPrefix(name))}
+
+function updateLiveTimes(){
+  const els=document.querySelectorAll('.js-ago[data-ts]');
+  for(const el of els){
+    const ts=Number(el.dataset.ts);
+    if(Number.isFinite(ts)) el.textContent=timeAgo(ts);
+  }
+}
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 async function checkAuth(){try{const r=await fetch('/admin/api/check');const d=await r.json();if(d.authed)showDashboard();else showLogin()}catch{showLogin()}}
@@ -476,12 +491,13 @@ async function loadSignups(){
   const body=$('#signups-body');
   if(!d.signups.length){body.innerHTML='<tr class="empty-row"><td colspan="5">No signups recorded since restart</td></tr>';return}
   body.innerHTML=d.signups.map(s=>`<tr>
-    <td>${timeAgo(s.ts)}</td>
-    <td><strong>${escHtml(s.username)}</strong></td>
+    <td><span class="js-ago" data-ts="${Number(s.ts)||0}">${timeAgo(s.ts)}</span></td>
+    <td><strong>${displayUsername(s.username)}</strong></td>
     <td><span class="badge b-cyan">${escHtml(s.provider)}</span></td>
     <td><code style="color:var(--text2);font-size:.78rem">${escHtml(s.ip)}</code></td>
-    <td>${s.referredBy?'<span class="badge b-purple">'+escHtml(s.referredBy)+'</span>':'<span style="color:var(--text3)">Direct</span>'}</td>
+    <td>${s.referredBy?'<button class="badge b-purple js-ref" data-code="'+escHtml(s.referredBy)+'" style="border:none">'+escHtml(s.referredBy)+'</button>':'<span style="color:var(--text3)">Direct</span>'}</td>
   </tr>`).join('');
+  updateLiveTimes();
 }
 
 // ── Payments ─────────────────────────────────────────────────────────────────
@@ -491,13 +507,14 @@ async function loadPayments(){
   const body=$('#payments-body');
   if(!d.payments.length){body.innerHTML='<tr class="empty-row"><td colspan="6">No payments recorded yet</td></tr>';return}
   body.innerHTML=d.payments.map(p=>`<tr>
-    <td>${timeAgo(p.ts)}</td>
-    <td><strong>${escHtml(p.username)}</strong></td>
+    <td><span class="js-ago" data-ts="${Number(p.ts)||0}">${timeAgo(p.ts)}</span></td>
+    <td><strong>${displayUsername(p.username)}</strong></td>
     <td>${PLAN_LABELS[p.plan]||escHtml(p.plan)}</td>
     <td>${METHOD_LABELS[p.method]||escHtml(p.method)}</td>
     <td>${tierBadge(p.grantedTier)}</td>
     <td>${p.screenshotB64?'<img class="screenshot-thumb" src="data:'+escHtml(p.contentType||'image/png')+';base64,'+p.screenshotB64+'" onclick="window._showSS(this.src)">':'—'}</td>
   </tr>`).join('');
+  updateLiveTimes();
 }
 window._showSS=function(src){$('#ss-modal-img').src=src;$('#ss-modal').classList.add('active')};
 $('#ss-modal').addEventListener('click',()=>{$('#ss-modal').classList.remove('active')});
@@ -509,10 +526,11 @@ async function loadTiers(){
   const body=$('#tiers-body');
   if(!d.tiers.length){body.innerHTML='<tr class="empty-row"><td colspan="3">No tier unlocks recorded yet</td></tr>';return}
   body.innerHTML=d.tiers.map(t=>`<tr>
-    <td>${timeAgo(t.ts)}</td>
-    <td><strong>${escHtml(t.username)}</strong></td>
+    <td><span class="js-ago" data-ts="${Number(t.ts)||0}">${timeAgo(t.ts)}</span></td>
+    <td><strong>${displayUsername(t.username)}</strong></td>
     <td>${tierBadge(t.tier)}</td>
   </tr>`).join('');
+  updateLiveTimes();
 }
 
 // ── Categories ───────────────────────────────────────────────────────────────
@@ -535,13 +553,13 @@ async function loadUsers(page,q){
   const d=await r.json();
   const body=$('#users-body');
   body.innerHTML=d.users.map(u=>`<tr>
-    <td><span class="dot ${u.online?'dot-on':'dot-off'}"></span>${u.online?'<span style="color:var(--green);font-weight:600">Online</span>':(u.lastSeen?'<span style="color:var(--text2)">'+timeAgo(u.lastSeen)+'</span>':'<span style="color:var(--text3)">Never</span>')}</td>
-    <td><strong>${escHtml(u.username)}</strong></td>
+    <td><span class="dot ${u.online?'dot-on':'dot-off'}"></span>${u.online?'<span style="color:var(--green);font-weight:600">Online</span>':(u.lastSeen?'<span class="js-ago" data-ts="'+Number(u.lastSeen)+'" style="color:var(--text2)">'+timeAgo(u.lastSeen)+'</span>':'<span style="color:var(--text3)">Never</span>')}</td>
+    <td><strong>${displayUsername(u.username)}</strong></td>
     <td><span class="badge b-cyan">${escHtml(u.provider)}</span></td>
     <td>${tierBadge(u.tier)}</td>
     <td>${u.referredCount}</td>
     <td><code style="color:var(--text2);font-size:.78rem">${escHtml(u.signupIp)}</code></td>
-    <td>${timeAgo(u.createdAt)}</td>
+    <td><span class="js-ago" data-ts="${Number(u.createdAt)||0}">${timeAgo(u.createdAt)}</span></td>
     <td><button class="btn btn-primary" style="padding:5px 12px;font-size:.75rem" onclick="window._viewUser('${escHtml(u.key)}')">View</button></td>
   </tr>`).join('');
   const totalPages=Math.ceil(d.total/d.perPage);
@@ -549,6 +567,7 @@ async function loadUsers(page,q){
   pg.innerHTML=`<span>${fmtNum(d.total)} users · Page ${d.page+1} of ${Math.max(1,totalPages)}</span>`;
   if(d.page>0)pg.innerHTML+=`<button class="btn btn-ghost" onclick="window._usersPage(${d.page-1})">← Prev</button>`;
   if(d.page+1<totalPages)pg.innerHTML+=`<button class="btn btn-ghost" onclick="window._usersPage(${d.page+1})">Next →</button>`;
+  updateLiveTimes();
 }
 window._usersPage=function(p){loadUsers(p)};
 $('#user-search-btn').addEventListener('click',()=>loadUsers(0,$('#user-search').value));
@@ -562,7 +581,7 @@ window._viewUser=async function(key){
   const modal=$('#user-modal');const content=$('#user-modal-content');
   content.innerHTML=`
     <div class="modal-header">
-      <h2><span class="dot ${u.online?'dot-on':'dot-off'}"></span>${escHtml(u.username)}</h2>
+      <h2><span class="dot ${u.online?'dot-on':'dot-off'}"></span>${displayUsername(u.username)}</h2>
       <button class="modal-close" id="mc-btn">&times;</button>
     </div>
     <div class="modal-body">
@@ -581,7 +600,7 @@ window._viewUser=async function(key){
         ${u.purchaseDate?'<div class="detail-item"><div class="dl">Purchase</div><div class="dv">'+escHtml(u.purchaseMethod||'?')+' · '+fmtDate(u.purchaseDate)+'</div></div>':''}
         ${u.premiumPaidAt?'<div class="detail-item"><div class="dl">Stripe Premium</div><div class="dv">'+fmtDate(u.premiumPaidAt)+'</div></div>':''}
       </div>
-      ${u.referredUsers&&u.referredUsers.length?'<div class="referred-list"><h4>Referred Users ('+u.referredUsers.length+')</h4><ul>'+u.referredUsers.map(r=>'<li>'+escHtml(r.username)+' <span style="color:var(--text3)">('+escHtml(r.key)+')</span></li>').join('')+'</ul></div>':''}
+      ${u.referredUsers&&u.referredUsers.length?'<div class="referred-list"><h4>Referred Users ('+u.referredUsers.length+')</h4><ul>'+u.referredUsers.map(r=>'<li>'+displayUsername(r.username)+' <span style="color:var(--text3)">('+escHtml(r.key)+')</span></li>').join('')+'</ul></div>':''}
     </div>
     <div class="modal-actions">
       <select class="tier-select" id="ts-modal">
@@ -609,8 +628,25 @@ window._viewUser=async function(key){
   });
 };
 
+// Click a referral code → open the owner user modal
+$('#signups-body').addEventListener('click', async (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('.js-ref') : null;
+  if (!btn) return;
+  const code = btn.dataset.code;
+  if (!code) return;
+  try {
+    const r = await fetch(`/admin/api/user/by-referral?code=${encodeURIComponent(code)}`);
+    const d = await r.json();
+    if (r.ok && d && d.key) window._viewUser(d.key);
+    else alert(d && d.error ? d.error : 'Referral owner not found');
+  } catch {
+    alert('Failed to look up referral owner');
+  }
+});
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 checkAuth();
+setInterval(updateLiveTimes, 1000);
 })();
 </script>
 </body>
