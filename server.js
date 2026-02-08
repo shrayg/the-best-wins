@@ -1531,8 +1531,15 @@ async function ensureUsersDbFresh() {
     if (!parsed.version) parsed.version = 1;
     usersDb = parsed;
     await loadSessionsOnceFromR2(parsed);
-  } catch {
-    usersDb = { version: 1, users: {} };
+  } catch (loadErr) {
+    // CRITICAL: never nuke an existing in-memory DB on a transient read error.
+    // Only initialise to empty if this is the very first load (usersDb is null).
+    if (usersDb && Object.keys(usersDb.users || {}).length > 0) {
+      console.error('[ensureUsersDbFresh] R2/disk read failed but keeping', Object.keys(usersDb.users).length, 'in-memory users. Error:', loadErr && loadErr.message ? loadErr.message : loadErr);
+    } else {
+      console.error('[ensureUsersDbFresh] First load failed, starting with empty DB. Error:', loadErr && loadErr.message ? loadErr.message : loadErr);
+      usersDb = { version: 1, users: {} };
+    }
   }
   return usersDb;
 }
@@ -1540,21 +1547,38 @@ async function ensureUsersDbFresh() {
 async function queueUsersDbWrite() {
   usersDbWritePromise = usersDbWritePromise.then(async () => {
     if (R2_ENABLED) {
+      const localUsers = usersDb && usersDb.users && typeof usersDb.users === 'object' ? usersDb.users : {};
+      const localCount = Object.keys(localUsers).length;
+
       // Merge-then-write to reduce multi-instance overwrite loss.
       let remoteDb = null;
+      let remoteReadFailed = false;
       try {
         const raw = await r2GetObject('data/users.json');
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && typeof parsed === 'object') remoteDb = parsed;
         }
-      } catch {
-        remoteDb = null;
+      } catch (mergeReadErr) {
+        remoteReadFailed = true;
+        console.error('[queueUsersDbWrite] R2 merge-read failed:', mergeReadErr && mergeReadErr.message ? mergeReadErr.message : mergeReadErr);
+      }
+
+      const remoteUsers = remoteDb && remoteDb.users && typeof remoteDb.users === 'object' ? remoteDb.users : {};
+      const remoteCount = Object.keys(remoteUsers).length;
+
+      // SAFETY: abort write if local is empty/tiny but remote has real data,
+      // or if we couldn't read remote at all and local is empty.
+      if (localCount === 0 && (remoteCount > 0 || remoteReadFailed)) {
+        console.error(`[queueUsersDbWrite] ABORT: local has 0 users but remote has ${remoteCount} (readFailed=${remoteReadFailed}). Not overwriting R2.`);
+        return;
+      }
+      if (remoteReadFailed && localCount > 0 && localCount < 5) {
+        console.error(`[queueUsersDbWrite] ABORT: R2 read failed and local only has ${localCount} users. Not risking overwrite.`);
+        return;
       }
 
       const merged = { version: 1, users: {} };
-      const remoteUsers = remoteDb && remoteDb.users && typeof remoteDb.users === 'object' ? remoteDb.users : {};
-      const localUsers = usersDb && usersDb.users && typeof usersDb.users === 'object' ? usersDb.users : {};
       merged.version = Math.max(
         (remoteDb && typeof remoteDb.version === 'number' ? remoteDb.version : 1),
         (usersDb && typeof usersDb.version === 'number' ? usersDb.version : 1)
@@ -1581,9 +1605,17 @@ async function queueUsersDbWrite() {
         merged.users[k] = next;
       }
 
+      // Final safety: never write fewer users than remote had.
+      const mergedCount = Object.keys(merged.users).length;
+      if (mergedCount < remoteCount) {
+        console.error(`[queueUsersDbWrite] ABORT: merged (${mergedCount}) < remote (${remoteCount}). Something is wrong.`);
+        return;
+      }
+
       usersDb = merged;
       const snapshot = JSON.stringify(merged, null, 2);
       await r2PutObject('data/users.json', snapshot, 'application/json');
+      console.log(`[queueUsersDbWrite] Wrote ${mergedCount} users to R2.`);
     } else {
       // Write to local disk
       await fs.promises.mkdir(DATA_DIR, { recursive: true });
