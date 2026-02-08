@@ -103,6 +103,7 @@ canvas{width:100%!important;height:100%!important}
 .section-title-row{justify-content:space-between}
 .section-title-row .st-left{display:flex;align-items:center;gap:8px}
 .section-title-row .st-right{display:flex;align-items:center;gap:8px}
+#payment-revenue{font-size:1.15rem;font-weight:800;padding:8px 16px;border-radius:999px;min-width:140px;justify-content:center}
 
 /* ── Geo Page ────────────────────────────────────────────────────── */
 .geo-chart-wrap{height:260px;position:relative}
@@ -179,7 +180,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
   .chart-wrap{height:160px}
   .mobile-nav{display:flex!important}
 }
-.mobile-nav{display:none;overflow-x:auto;gap:4px;padding:0 0 16px;margin-bottom:8px}
+.mobile-nav{display:none;overflow-x:auto;gap:4px;padding:6px 0 16px;margin-bottom:8px;position:sticky;top:0;z-index:50;background:var(--bg);-webkit-overflow-scrolling:touch}
 .mobile-nav .nav-btn{white-space:nowrap;flex-shrink:0}
 @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .stat-card,.chart-card,.table-card{animation:fadein .3s ease}
@@ -379,15 +380,22 @@ $('#logout-btn').addEventListener('click',async()=>{await fetch('/admin/api/logo
 
 // ── Navigation ───────────────────────────────────────────────────────────────
 const PAGE_TITLES={overview:'Overview',signups:'Signups',payments:'Payments',tiers:'Tier Unlocks',categories:'Categories',geolocation:'Geolocation',users:'Users'};
+function activatePage(pg){
+  if(!pg) return;
+  $$('.nav-btn').forEach(b=>b.classList.remove('active'));
+  $$(`.nav-btn[data-page="${pg}"]`).forEach(b=>b.classList.add('active'));
+  $$('.page').forEach(p=>p.classList.remove('active'));
+  const pageEl=$(`#page-${pg}`);
+  if(pageEl) pageEl.classList.add('active');
+  $('#page-title').textContent=PAGE_TITLES[pg]||pg;
+}
 $$('.nav-btn[data-page]').forEach(btn=>{
-  btn.addEventListener('click',()=>{
+  const handler=(e)=>{
     const pg=btn.dataset.page;
-    $$('.nav-btn').forEach(b=>b.classList.remove('active'));
-    $$(`.nav-btn[data-page="${pg}"]`).forEach(b=>b.classList.add('active'));
-    $$('.page').forEach(p=>p.classList.remove('active'));
-    $(`#page-${pg}`).classList.add('active');
-    $('#page-title').textContent=PAGE_TITLES[pg]||pg;
-  });
+    activatePage(pg);
+  };
+  btn.addEventListener('click',handler);
+  btn.addEventListener('touchstart',(e)=>{e.preventDefault();handler(e);},{passive:false});
 });
 
 // ── Data Loading ─────────────────────────────────────────────────────────────

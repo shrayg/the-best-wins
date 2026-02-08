@@ -2026,6 +2026,25 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { ok: true });
     }
 
+    // Admin: fetch payment screenshot (redirect to R2 presigned URL)
+    if (requestUrl.pathname === '/admin/payment-image') {
+      if (!isAdminAuthed(req)) return sendText(res, 401, 'Not authorized');
+      const key = requestUrl.searchParams.get('key') || '';
+      if (!key) return sendText(res, 400, 'Missing key');
+      if (R2_ENABLED) {
+        const url = r2PresignedUrl(key, 600);
+        res.writeHead(302, { Location: url, 'Cache-Control': 'no-store' });
+        return res.end();
+      }
+      // Local fallback
+      const fileName = path.basename(key);
+      const p = path.join(DATA_DIR, 'payments', fileName);
+      if (!fs.existsSync(p)) return sendText(res, 404, 'Not found');
+      const buf = fs.readFileSync(p);
+      res.writeHead(200, { 'Content-Type': getContentType(p), 'Cache-Control': 'no-store' });
+      return res.end(buf);
+    }
+
     // All other /admin/api/* require auth
     if (requestUrl.pathname.startsWith('/admin/api/')) {
       if (!isAdminAuthed(req)) return sendJson(res, 401, { error: 'Not authorized' });
@@ -2101,24 +2120,6 @@ const server = http.createServer(async (req, res) => {
       // Recent tier unlocks
       if (requestUrl.pathname === '/admin/api/tiers') {
         return sendJson(res, 200, { tiers: adminTierLog.slice().reverse() });
-      }
-
-      // Admin: fetch payment screenshot (redirect to R2 presigned URL)
-      if (requestUrl.pathname === '/admin/payment-image') {
-        const key = requestUrl.searchParams.get('key') || '';
-        if (!key) return sendText(res, 400, 'Missing key');
-        if (R2_ENABLED) {
-          const url = r2PresignedUrl(key, 600);
-          res.writeHead(302, { Location: url, 'Cache-Control': 'no-store' });
-          return res.end();
-        }
-        // Local fallback
-        const fileName = path.basename(key);
-        const p = path.join(DATA_DIR, 'payments', fileName);
-        if (!fs.existsSync(p)) return sendText(res, 404, 'Not found');
-        const buf = fs.readFileSync(p);
-        res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' });
-        return res.end(buf);
       }
 
       // List all users (paginated)
