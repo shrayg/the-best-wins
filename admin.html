@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel — The Best Wins</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0a0a0f;--card:#12121a;--border:#1e1e2e;--accent:#7c3aed;--accent2:#22d3ee;--text:#e2e2e8;--text2:#8888a0;--red:#ef4444;--green:#22c55e;--gold:#ffd700;--orange:#f97316}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--accent2);text-decoration:none}
+button{cursor:pointer;font-family:inherit}
+
+/* Login screen */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:40px;max-width:380px;width:100%;text-align:center}
+.login-box h1{font-size:1.5rem;margin-bottom:8px}
+.login-box p{color:var(--text2);margin-bottom:24px;font-size:0.9rem}
+.login-box input{width:100%;padding:12px 16px;background:#1a1a26;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;margin-bottom:16px;outline:none}
+.login-box input:focus{border-color:var(--accent)}
+.login-box button{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;transition:background .2s}
+.login-box button:hover{background:#6d28d9}
+.login-error{color:var(--red);font-size:0.85rem;margin-top:8px;display:none}
+
+/* Dashboard */
+#dashboard{display:none;padding:20px;max-width:1400px;margin:0 auto}
+.dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.dash-header h1{font-size:1.6rem;font-weight:700}
+.dash-header .right{display:flex;gap:12px;align-items:center}
+.btn-sm{padding:8px 16px;border-radius:6px;border:none;font-size:0.85rem;font-weight:600;transition:.2s}
+.btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{background:#6d28d9}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}.btn-outline:hover{border-color:var(--accent);color:var(--text)}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#dc2626}
+
+/* Stat cards */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden}
+.stat-card .label{font-size:0.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.stat-card .value{font-size:2rem;font-weight:700}
+.stat-card .sub{font-size:0.8rem;color:var(--text2);margin-top:4px}
+.stat-card.accent .value{color:var(--accent)}
+.stat-card.cyan .value{color:var(--accent2)}
+.stat-card.green .value{color:var(--green)}
+.stat-card.gold .value{color:var(--gold)}
+.stat-card.orange .value{color:var(--orange)}
+
+/* Chart */
+.chart-section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:24px}
+.chart-section h3{font-size:1rem;margin-bottom:12px;color:var(--text2)}
+.chart-wrap{height:200px;position:relative}
+canvas{width:100%!important;height:100%!important}
+
+/* Tabs */
+.tab-bar{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;flex-wrap:wrap}
+.tab-btn{padding:10px 20px;background:transparent;color:var(--text2);border:none;border-bottom:2px solid transparent;font-size:0.9rem;font-weight:500;transition:.2s}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-btn:hover{color:var(--text)}
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* Tables */
+.table-wrap{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:0.85rem}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border)}
+th{color:var(--text2);font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;background:rgba(255,255,255,0.02)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.badge{display:inline-block;padding:2px 8px;border-radius:50px;font-size:0.75rem;font-weight:600}
+.badge-green{background:rgba(34,197,94,0.15);color:var(--green)}
+.badge-red{background:rgba(239,68,68,0.15);color:var(--red)}
+.badge-gold{background:rgba(255,215,0,0.15);color:var(--gold)}
+.badge-purple{background:rgba(124,58,237,0.15);color:var(--accent)}
+.badge-cyan{background:rgba(34,211,238,0.15);color:var(--accent2)}
+.badge-gray{background:rgba(136,136,160,0.15);color:var(--text2)}
+
+/* User search */
+.search-bar{display:flex;gap:8px;margin-bottom:16px}
+.search-bar input{flex:1;padding:10px 14px;background:#1a1a26;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;outline:none}
+.search-bar input:focus{border-color:var(--accent)}
+.search-bar button{padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:600}
+
+/* User detail modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.active{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:680px;width:100%;max-height:85vh;overflow-y:auto;padding:28px}
+.modal h2{font-size:1.3rem;margin-bottom:20px;display:flex;align-items:center;gap:12px}
+.modal-close{margin-left:auto;background:none;border:none;color:var(--text2);font-size:1.5rem;cursor:pointer}
+.modal-close:hover{color:var(--text)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.detail-item{padding:12px;background:rgba(255,255,255,0.02);border-radius:8px}
+.detail-item .dlabel{font-size:0.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px}
+.detail-item .dvalue{font-size:0.95rem;word-break:break-all}
+.detail-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.tier-select{padding:8px 12px;background:#1a1a26;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem}
+.referred-list{margin-top:12px}
+.referred-list h4{font-size:0.85rem;color:var(--text2);margin-bottom:8px}
+.referred-list ul{list-style:none;font-size:0.85rem}
+.referred-list li{padding:4px 0;border-bottom:1px solid var(--border)}
+
+/* Category bars */
+.cat-bars{display:flex;flex-direction:column;gap:8px}
+.cat-bar{display:flex;align-items:center;gap:10px}
+.cat-bar .cat-name{width:130px;font-size:0.85rem;color:var(--text2);text-align:right;flex-shrink:0}
+.cat-bar .bar-bg{flex:1;height:28px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;position:relative}
+.cat-bar .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px;transition:width .5s;display:flex;align-items:center;padding:0 8px;font-size:0.75rem;font-weight:600;min-width:fit-content}
+
+/* Screenshots */
+.screenshot-thumb{max-width:120px;max-height:80px;border-radius:6px;cursor:pointer;border:1px solid var(--border)}
+.screenshot-thumb:hover{border-color:var(--accent)}
+.ss-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20000;align-items:center;justify-content:center;cursor:pointer}
+.ss-modal.active{display:flex}
+.ss-modal img{max-width:90vw;max-height:90vh;border-radius:8px}
+
+/* Status dot */
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.dot-green{background:var(--green)}
+.dot-gray{background:#555}
+
+/* Responsive */
+@media(max-width:600px){
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .detail-grid{grid-template-columns:1fr}
+  .cat-bar .cat-name{width:90px;font-size:0.75rem}
+}
+
+/* Refresh indicator */
+.refresh-spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>Admin Panel</h1>
+    <p>The Best Wins — Dashboard</p>
+    <input type="password" id="admin-pw" placeholder="Enter password" autocomplete="off">
+    <button id="admin-login-btn">Login</button>
+    <div class="login-error" id="login-error">Wrong password</div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="dash-header">
+    <h1>Dashboard</h1>
+    <div class="right">
+      <button class="btn-sm btn-outline" id="refresh-btn" title="Refresh data">&#x21bb; Refresh</button>
+      <button class="btn-sm btn-outline" id="logout-btn">Logout</button>
+    </div>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="stat-grid" id="stat-grid"></div>
+
+  <!-- Visit Chart -->
+  <div class="chart-section">
+    <h3>Visits — Last 24 Hours</h3>
+    <div class="chart-wrap">
+      <canvas id="visit-chart"></canvas>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" data-tab="signups">Signups</button>
+    <button class="tab-btn" data-tab="payments">Payments</button>
+    <button class="tab-btn" data-tab="tiers">Tier Unlocks</button>
+    <button class="tab-btn" data-tab="categories">Categories</button>
+    <button class="tab-btn" data-tab="users">Users</button>
+  </div>
+
+  <!-- Signups Tab -->
+  <div class="tab-panel active" id="tab-signups">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Username</th><th>Provider</th><th>IP</th><th>Referred By</th></tr></thead>
+        <tbody id="signups-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Payments Tab -->
+  <div class="tab-panel" id="tab-payments">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>User</th><th>Plan</th><th>Method</th><th>Tier Granted</th><th>Screenshot</th></tr></thead>
+        <tbody id="payments-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tier Unlocks Tab -->
+  <div class="tab-panel" id="tab-tiers">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Username</th><th>Tier</th></tr></thead>
+        <tbody id="tiers-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Categories Tab -->
+  <div class="tab-panel" id="tab-categories">
+    <h3 style="margin-bottom:16px;color:var(--text2)">Most Visited Categories (since server restart)</h3>
+    <div class="cat-bars" id="cat-bars"></div>
+  </div>
+
+  <!-- Users Tab -->
+  <div class="tab-panel" id="tab-users">
+    <div class="search-bar">
+      <input type="text" id="user-search" placeholder="Search by username or key...">
+      <button id="user-search-btn">Search</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Status</th><th>Username</th><th>Provider</th><th>Tier</th><th>Referrals</th><th>Signup IP</th><th>Created</th><th></th></tr></thead>
+        <tbody id="users-body"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:12px;align-items:center" id="users-pagination"></div>
+  </div>
+</div>
+
+<!-- User Detail Modal -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal" id="user-modal-content"></div>
+</div>
+
+<!-- Screenshot Lightbox -->
+<div class="ss-modal" id="ss-modal">
+  <img id="ss-modal-img" src="" alt="screenshot">
+</div>
+
+<script>
+// roundRect polyfill for older browsers
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
+    const r = Array.isArray(radii) ? radii[0] || 0 : radii || 0;
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.arcTo(x + w, y, x + w, y + r, r);
+    this.lineTo(x + w, y + h);
+    this.lineTo(x, y + h);
+    this.lineTo(x, y + r);
+    this.arcTo(x, y, x + r, y, r);
+    this.closePath();
+  };
+}
+(function() {
+  const $ = (s, c) => (c || document).querySelector(s);
+  const $$ = (s, c) => [...(c || document).querySelectorAll(s)];
+  const PLAN_LABELS = { tier1: 'Tier 1 — $5.99', premium: 'Premium — $9.99' };
+  const METHOD_LABELS = { paypal: 'PayPal', cashapp: 'Cash App', zelle: 'Zelle', venmo: 'Venmo', applepay: 'Apple Pay' };
+
+  function timeAgo(ts) {
+    if (!ts) return '—';
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return s + 's ago';
+    if (s < 3600) return Math.floor(s / 60) + 'm ago';
+    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+    return Math.floor(s / 86400) + 'd ago';
+  }
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    return new Date(ts).toLocaleString();
+  }
+  function tierBadge(t) {
+    if (t === 2) return '<span class="badge badge-gold">Premium</span>';
+    if (t === 1) return '<span class="badge badge-purple">Tier 1</span>';
+    return '<span class="badge badge-gray">Free</span>';
+  }
+  function escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ── Auth ───────────────────────────────────────────────────────────────
+  async function checkAuth() {
+    try {
+      const r = await fetch('/admin/api/check');
+      const d = await r.json();
+      if (d.authed) showDashboard();
+      else showLogin();
+    } catch { showLogin(); }
+  }
+
+  function showLogin() {
+    $('#login-screen').style.display = 'flex';
+    $('#dashboard').style.display = 'none';
+  }
+  function showDashboard() {
+    $('#login-screen').style.display = 'none';
+    $('#dashboard').style.display = 'block';
+    loadAll();
+  }
+
+  $('#admin-login-btn').addEventListener('click', doLogin);
+  $('#admin-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+  async function doLogin() {
+    const pw = $('#admin-pw').value;
+    const r = await fetch('/admin/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    if (r.ok) { showDashboard(); }
+    else { $('#login-error').style.display = 'block'; }
+  }
+
+  $('#logout-btn').addEventListener('click', async () => {
+    await fetch('/admin/api/logout', { method: 'POST' });
+    showLogin();
+  });
+
+  // ── Tabs ───────────────────────────────────────────────────────────────
+  $$('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('.tab-btn').forEach(b => b.classList.remove('active'));
+      $$('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      $(`#tab-${btn.dataset.tab}`).classList.add('active');
+    });
+  });
+
+  // ── Data Loading ───────────────────────────────────────────────────────
+  let refreshing = false;
+  async function loadAll() {
+    if (refreshing) return;
+    refreshing = true;
+    const btn = $('#refresh-btn');
+    btn.innerHTML = '<span class="refresh-spin" style="display:inline-block">&#x21bb;</span> Loading...';
+    try {
+      await Promise.all([loadStats(), loadSignups(), loadPayments(), loadTiers(), loadUsers()]);
+    } catch (e) { console.error(e); }
+    btn.innerHTML = '&#x21bb; Refresh';
+    refreshing = false;
+  }
+  $('#refresh-btn').addEventListener('click', loadAll);
+
+  // Auto-refresh every 30s
+  setInterval(() => { if ($('#dashboard').style.display !== 'none') loadAll(); }, 30000);
+
+  // ── Stats Cards ────────────────────────────────────────────────────────
+  async function loadStats() {
+    const r = await fetch('/admin/api/stats');
+    const d = await r.json();
+    const grid = $('#stat-grid');
+    grid.innerHTML = `
+      <div class="stat-card accent"><div class="label">Total Users</div><div class="value">${d.totalUsers}</div></div>
+      <div class="stat-card cyan"><div class="label">Signups (24h)</div><div class="value">${d.signups24h}</div></div>
+      <div class="stat-card green"><div class="label">Active Now</div><div class="value">${d.activeNow}</div><div class="sub">Last 5 minutes</div></div>
+      <div class="stat-card"><div class="label">Visits (24h)</div><div class="value">${d.visits.past24h}</div></div>
+      <div class="stat-card"><div class="label">Visits (30m)</div><div class="value">${d.visits.past30m}</div></div>
+      <div class="stat-card"><div class="label">All-Time Visits</div><div class="value">${(d.visits.allTime || 0).toLocaleString()}</div></div>
+      <div class="stat-card gold"><div class="label">Tier 1 Users</div><div class="value">${d.tier1Count}</div></div>
+      <div class="stat-card orange"><div class="label">Premium Users</div><div class="value">${d.tier2Count}</div></div>
+      <div class="stat-card"><div class="label">Paid Users</div><div class="value">${d.paidCount}</div></div>
+    `;
+    drawChart(d.hourlyVisits);
+  }
+
+  // ── Chart ──────────────────────────────────────────────────────────────
+  let chartInstance = null;
+  function drawChart(hourly) {
+    const canvas = $('#visit-chart');
+    const ctx = canvas.getContext('2d');
+    // Simple bar chart (no external lib)
+    const { labels, data } = hourly;
+    const max = Math.max(...data, 1);
+    const w = canvas.parentElement.clientWidth;
+    const h = canvas.parentElement.clientHeight;
+    canvas.width = w * (window.devicePixelRatio || 1);
+    canvas.height = h * (window.devicePixelRatio || 1);
+    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+    ctx.clearRect(0, 0, w, h);
+
+    const barCount = data.length;
+    const padding = 40;
+    const barGap = 2;
+    const barW = Math.max(4, (w - padding * 2) / barCount - barGap);
+    const chartH = h - padding - 20;
+
+    // Y-axis gridlines
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padding / 2 + (chartH / 4) * i;
+      ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(w - 10, y); ctx.stroke();
+      ctx.fillStyle = '#555';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(max - (max / 4) * i), padding - 6, y + 4);
+    }
+
+    // Bars
+    const gradient = ctx.createLinearGradient(0, 0, 0, chartH);
+    gradient.addColorStop(0, '#7c3aed');
+    gradient.addColorStop(1, '#22d3ee');
+
+    for (let i = 0; i < barCount; i++) {
+      const x = padding + i * (barW + barGap);
+      const barH = Math.max(1, (data[i] / max) * chartH);
+      const y = padding / 2 + chartH - barH;
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.roundRect(x, y, barW, barH, [3, 3, 0, 0]);
+      ctx.fill();
+
+      // Label every 3rd
+      if (i % 3 === 0 || i === barCount - 1) {
+        ctx.fillStyle = '#666';
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(labels[i], x + barW / 2, h - 4);
+      }
+    }
+  }
+
+  // ── Signups Table ──────────────────────────────────────────────────────
+  async function loadSignups() {
+    const r = await fetch('/admin/api/signups');
+    const d = await r.json();
+    const body = $('#signups-body');
+    if (!d.signups.length) { body.innerHTML = '<tr><td colspan="5" style="color:var(--text2);text-align:center;padding:24px">No signups recorded yet (since server restart)</td></tr>'; return; }
+    body.innerHTML = d.signups.map(s => `
+      <tr>
+        <td>${timeAgo(s.ts)}</td>
+        <td>${escHtml(s.username)}</td>
+        <td><span class="badge badge-cyan">${escHtml(s.provider)}</span></td>
+        <td>${escHtml(s.ip)}</td>
+        <td>${s.referredBy ? escHtml(s.referredBy) : '<span style="color:var(--text2)">Direct</span>'}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Payments Table ─────────────────────────────────────────────────────
+  async function loadPayments() {
+    const r = await fetch('/admin/api/payments');
+    const d = await r.json();
+    const body = $('#payments-body');
+    if (!d.payments.length) { body.innerHTML = '<tr><td colspan="6" style="color:var(--text2);text-align:center;padding:24px">No payments recorded yet</td></tr>'; return; }
+    body.innerHTML = d.payments.map(p => `
+      <tr>
+        <td>${timeAgo(p.ts)}</td>
+        <td>${escHtml(p.username)}</td>
+        <td>${PLAN_LABELS[p.plan] || escHtml(p.plan)}</td>
+        <td>${METHOD_LABELS[p.method] || escHtml(p.method)}</td>
+        <td>${tierBadge(p.grantedTier)}</td>
+        <td>${p.screenshotB64 ? '<img class="screenshot-thumb" src="data:' + escHtml(p.contentType || 'image/png') + ';base64,' + p.screenshotB64 + '" onclick="window._showSS(this.src)">' : '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  // Screenshot lightbox
+  window._showSS = function(src) {
+    const m = $('#ss-modal');
+    $('#ss-modal-img').src = src;
+    m.classList.add('active');
+  };
+  $('#ss-modal').addEventListener('click', () => { $('#ss-modal').classList.remove('active'); });
+
+  // ── Tiers Table ────────────────────────────────────────────────────────
+  async function loadTiers() {
+    const r = await fetch('/admin/api/tiers');
+    const d = await r.json();
+    const body = $('#tiers-body');
+    if (!d.tiers.length) { body.innerHTML = '<tr><td colspan="3" style="color:var(--text2);text-align:center;padding:24px">No tier unlocks recorded yet</td></tr>'; return; }
+    body.innerHTML = d.tiers.map(t => `
+      <tr>
+        <td>${timeAgo(t.ts)}</td>
+        <td>${escHtml(t.username)}</td>
+        <td>${tierBadge(t.tier)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Categories ─────────────────────────────────────────────────────────
+  function renderCategories(catHits) {
+    const el = $('#cat-bars');
+    const entries = Object.entries(catHits || {}).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) { el.innerHTML = '<p style="color:var(--text2)">No category views yet (since server restart)</p>'; return; }
+    const maxVal = Math.max(...entries.map(e => e[1]), 1);
+    el.innerHTML = entries.map(([name, count]) => {
+      const pct = Math.max(3, (count / maxVal) * 100);
+      return `<div class="cat-bar">
+        <div class="cat-name">${escHtml(name)}</div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%">${count}</div></div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Users Table ────────────────────────────────────────────────────────
+  let usersPage = 0;
+  let usersQuery = '';
+
+  async function loadUsers(page, q) {
+    if (page !== undefined) usersPage = page;
+    if (q !== undefined) usersQuery = q;
+    const r = await fetch(`/admin/api/users?page=${usersPage}&q=${encodeURIComponent(usersQuery)}`);
+    const d = await r.json();
+    const body = $('#users-body');
+    body.innerHTML = d.users.map(u => `
+      <tr>
+        <td><span class="dot ${u.online ? 'dot-green' : 'dot-gray'}"></span>${u.online ? 'Online' : (u.lastSeen ? timeAgo(u.lastSeen) : 'Never')}</td>
+        <td>${escHtml(u.username)}</td>
+        <td><span class="badge badge-cyan">${escHtml(u.provider)}</span></td>
+        <td>${tierBadge(u.tier)}</td>
+        <td>${u.referredCount}</td>
+        <td>${escHtml(u.signupIp)}</td>
+        <td>${timeAgo(u.createdAt)}</td>
+        <td><button class="btn-sm btn-accent" onclick="window._viewUser('${escHtml(u.key)}')">View</button></td>
+      </tr>
+    `).join('');
+    // Pagination
+    const totalPages = Math.ceil(d.total / d.perPage);
+    const pg = $('#users-pagination');
+    pg.innerHTML = `<span style="color:var(--text2);font-size:0.85rem">${d.total} users — Page ${d.page + 1} of ${Math.max(1, totalPages)}</span>`;
+    if (d.page > 0) pg.innerHTML += `<button class="btn-sm btn-outline" onclick="window._usersPage(${d.page - 1})">← Prev</button>`;
+    if (d.page + 1 < totalPages) pg.innerHTML += `<button class="btn-sm btn-outline" onclick="window._usersPage(${d.page + 1})">Next →</button>`;
+  }
+
+  window._usersPage = function(p) { loadUsers(p); };
+
+  $('#user-search-btn').addEventListener('click', () => { loadUsers(0, $('#user-search').value); });
+  $('#user-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadUsers(0, e.target.value); });
+
+  // ── User Detail Modal ──────────────────────────────────────────────────
+  window._viewUser = async function(key) {
+    const r = await fetch(`/admin/api/user?key=${encodeURIComponent(key)}`);
+    if (!r.ok) { alert('User not found'); return; }
+    const u = await r.json();
+    const modal = $('#user-modal');
+    const content = $('#user-modal-content');
+
+    content.innerHTML = `
+      <h2>
+        <span class="dot ${u.online ? 'dot-green' : 'dot-gray'}"></span>
+        ${escHtml(u.username)}
+        <button class="modal-close" id="modal-close-btn">&times;</button>
+      </h2>
+      <div class="detail-grid">
+        <div class="detail-item"><div class="dlabel">Key</div><div class="dvalue">${escHtml(u.key)}</div></div>
+        <div class="detail-item"><div class="dlabel">Provider</div><div class="dvalue">${escHtml(u.provider)}</div></div>
+        <div class="detail-item"><div class="dlabel">Tier</div><div class="dvalue">${tierBadge(u.tier)}</div></div>
+        <div class="detail-item"><div class="dlabel">Status</div><div class="dvalue">${u.online ? '<span class="badge badge-green">Online</span>' : '<span class="badge badge-gray">Offline</span>'}</div></div>
+        <div class="detail-item"><div class="dlabel">Last Seen</div><div class="dvalue">${u.lastSeen ? fmtDate(u.lastSeen) + ' (' + timeAgo(u.lastSeen) + ')' : 'Never'}</div></div>
+        <div class="detail-item"><div class="dlabel">Created</div><div class="dvalue">${fmtDate(u.createdAt)}</div></div>
+        <div class="detail-item"><div class="dlabel">Signup IP</div><div class="dvalue">${escHtml(u.signupIp)}</div></div>
+        <div class="detail-item"><div class="dlabel">Referral Code</div><div class="dvalue">${u.referralCode || '—'}</div></div>
+        <div class="detail-item"><div class="dlabel">Referred By</div><div class="dvalue">${u.referredBy || 'Direct'}</div></div>
+        <div class="detail-item"><div class="dlabel">Password</div><div class="dvalue">${u.salt || '—'}</div></div>
+        ${u.discordId ? '<div class="detail-item"><div class="dlabel">Discord ID</div><div class="dvalue">' + escHtml(u.discordId) + '</div></div>' : ''}
+        ${u.purchaseDate ? '<div class="detail-item"><div class="dlabel">Purchase</div><div class="dvalue">' + escHtml(u.purchaseMethod || '?') + ' on ' + fmtDate(u.purchaseDate) + '</div></div>' : ''}
+        ${u.premiumPaidAt ? '<div class="detail-item"><div class="dlabel">Stripe Premium</div><div class="dvalue">' + fmtDate(u.premiumPaidAt) + '</div></div>' : ''}
+      </div>
+      ${u.referredUsers && u.referredUsers.length ? '<div class="referred-list"><h4>Referred Users (' + u.referredUsers.length + ')</h4><ul>' + u.referredUsers.map(r => '<li>' + escHtml(r.username) + ' <span style="color:var(--text2)">(' + escHtml(r.key) + ')</span></li>').join('') + '</ul></div>' : ''}
+      <div class="detail-actions">
+        <select class="tier-select" id="tier-select-modal">
+          <option value="0" ${u.tier === 0 || u.tier === null ? 'selected' : ''}>Free (No Tier)</option>
+          <option value="1" ${u.tier === 1 ? 'selected' : ''}>Tier 1</option>
+          <option value="2" ${u.tier === 2 ? 'selected' : ''}>Premium (Tier 2)</option>
+        </select>
+        <button class="btn-sm btn-accent" id="save-tier-btn">Save Tier</button>
+        <button class="btn-sm btn-red" id="delete-user-btn">Delete User</button>
+      </div>
+    `;
+
+    modal.classList.add('active');
+
+    // Close
+    $('#modal-close-btn').addEventListener('click', () => modal.classList.remove('active'));
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
+
+    // Save tier
+    $('#save-tier-btn').addEventListener('click', async () => {
+      const newTier = parseInt($('#tier-select-modal').value, 10);
+      const resp = await fetch('/admin/api/user/set-tier', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: u.key, tier: newTier }),
+      });
+      if (resp.ok) {
+        alert('Tier updated!');
+        modal.classList.remove('active');
+        loadUsers(); loadStats();
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        alert('Error: ' + (err.error || 'Unknown'));
+      }
+    });
+
+    // Delete user
+    $('#delete-user-btn').addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to DELETE ' + u.username + '? This cannot be undone.')) return;
+      const resp = await fetch('/admin/api/user/delete', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: u.key }),
+      });
+      if (resp.ok) {
+        alert('User deleted');
+        modal.classList.remove('active');
+        loadUsers(); loadStats();
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        alert('Error: ' + (err.error || 'Unknown'));
+      }
+    });
+  };
+
+  // ── Stats load also populates categories ───────────────────────────────
+  const _origLoadStats = loadStats;
+  loadStats = async function() {
+    const r = await fetch('/admin/api/stats');
+    const d = await r.json();
+    const grid = $('#stat-grid');
+    grid.innerHTML = `
+      <div class="stat-card accent"><div class="label">Total Users</div><div class="value">${d.totalUsers}</div></div>
+      <div class="stat-card cyan"><div class="label">Signups (24h)</div><div class="value">${d.signups24h}</div></div>
+      <div class="stat-card green"><div class="label">Active Now</div><div class="value">${d.activeNow}</div><div class="sub">Last 5 minutes</div></div>
+      <div class="stat-card"><div class="label">Visits (24h)</div><div class="value">${d.visits.past24h}</div></div>
+      <div class="stat-card"><div class="label">Visits (30m)</div><div class="value">${d.visits.past30m}</div></div>
+      <div class="stat-card"><div class="label">All-Time Visits</div><div class="value">${(d.visits.allTime || 0).toLocaleString()}</div></div>
+      <div class="stat-card gold"><div class="label">Tier 1 Users</div><div class="value">${d.tier1Count}</div></div>
+      <div class="stat-card orange"><div class="label">Premium Users</div><div class="value">${d.tier2Count}</div></div>
+      <div class="stat-card"><div class="label">Paid Users</div><div class="value">${d.paidCount}</div></div>
+    `;
+    drawChart(d.hourlyVisits);
+    renderCategories(d.categoryHits);
+  };
+
+  // ── Init ───────────────────────────────────────────────────────────────
+  checkAuth();
+})();
+</script>
+</body>
+</html>

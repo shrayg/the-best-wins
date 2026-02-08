@@ -878,6 +878,58 @@ loadVisitStatsFromDisk();
 // Send visit stats every 30 minutes
 setInterval(sendVisitStatsWebhook, 30 * 60 * 1000);
 
+// ── Admin Dashboard: in-memory analytics ────────────────────────────────────
+const ADMIN_PASSWORD = 'drowssap';
+const ADMIN_COOKIE = 'tbw_admin';
+const ADMIN_TOKEN_TTL = 86400000 * 7; // 7 days
+
+const adminTokens = new Set();
+
+// Ring buffers (keep last 500 of each event type in memory)
+const adminSignupLog    = []; // { ts, username, provider, ip, referredBy }
+const adminPaymentLog   = []; // { ts, username, plan, method, screenshotB64 }
+const adminTierLog      = []; // { ts, username, tier }
+const adminCategoryHits = {}; // { 'Streamer Wins': 123, ... }
+const adminLastSeen     = new Map(); // userKey → timestamp (updated on every authed request)
+
+function adminPush(arr, entry, max) {
+  arr.push(entry);
+  if (arr.length > (max || 500)) arr.shift();
+}
+
+function getActiveUsersNow() {
+  const cutoff = Date.now() - 5 * 60 * 1000; // active within last 5 min
+  let count = 0;
+  for (const ts of adminLastSeen.values()) {
+    if (ts >= cutoff) count++;
+  }
+  return count;
+}
+
+function getHourlyVisitData() {
+  const now = Date.now();
+  const buckets = new Array(24).fill(0);
+  for (let i = visitLog.length - 1; i >= 0; i--) {
+    const age = now - visitLog[i];
+    if (age > 86400000) break;
+    const hoursAgo = Math.floor(age / 3600000);
+    if (hoursAgo < 24) buckets[23 - hoursAgo]++;
+  }
+  // labels: 23h ago, 22h ago, ... , 0h ago (now)
+  const labels = [];
+  for (let i = 0; i < 24; i++) {
+    const h = 23 - i;
+    labels.push(h === 0 ? 'Now' : `-${h}h`);
+  }
+  return { labels, data: buckets };
+}
+
+function isAdminAuthed(req) {
+  const cookies = parseCookies(req);
+  const tok = cookies[ADMIN_COOKIE];
+  return tok && adminTokens.has(tok);
+}
+
 async function readMegaLinks() {
   let raw;
   try {
@@ -1248,6 +1300,8 @@ function _getMonotonicSignupTotal(db) {
 }
 
 function _emitSignup(db, username, provider, referredBy, ip) {
+  // Admin log
+  adminPush(adminSignupLog, { ts: Date.now(), username: String(username), provider: String(provider), ip: String(ip || 'unknown'), referredBy: referredBy || null });
   const total = _getMonotonicSignupTotal(db);
   const last24h = _usersSignedUpLast24h(db);
   let referrerName = null;
@@ -1326,6 +1380,8 @@ function _emitTierReached(db, req, userKey, tier) {
     const ageStr = createdAt ? formatAccountAge(Date.now() - createdAt) : 'unknown';
 
     const displayName = stripDiscordPrefix(u.username || userKey);
+    // Admin log
+    adminPush(adminTierLog, { ts: Date.now(), username: displayName, tier });
     const isDiscord = String(userKey).startsWith('discord_') && u.discordId;
     const mention = isDiscord ? `<@${u.discordId}>` : `@${displayName}`;
 
@@ -1493,6 +1549,186 @@ function safeFilePath(urlPathname) {
 const server = http.createServer(async (req, res) => {
   try {
     const requestUrl = new URL(req.url, `http://${req.headers.host}`);
+
+    // Track last-seen for active-user stats
+    try {
+      await ensureSessionsLoaded();
+      const _uk = getAuthedUserKey(req);
+      if (_uk) adminLastSeen.set(_uk, Date.now());
+    } catch {}
+
+    // ===== ADMIN PANEL =====
+    if (requestUrl.pathname === '/admin') {
+      res.writeHead(302, { Location: '/admin/' });
+      return res.end();
+    }
+    if (requestUrl.pathname === '/admin/') {
+      const fp = path.join(__dirname, 'admin.html');
+      let html;
+      try { html = await fs.promises.readFile(fp, 'utf8'); } catch { return sendText(res, 404, 'Admin page not found'); }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(html);
+    }
+    if (requestUrl.pathname === '/admin/api/login') {
+      if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method Not Allowed' });
+      const body = await readJsonBody(req, res);
+      if (!body) return;
+      if (String(body.password) !== ADMIN_PASSWORD) return sendJson(res, 401, { error: 'Wrong password' });
+      const token = crypto.randomBytes(32).toString('hex');
+      adminTokens.add(token);
+      appendSetCookie(res, `${ADMIN_COOKIE}=${token}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=${ADMIN_TOKEN_TTL / 1000 | 0}`);
+      return sendJson(res, 200, { ok: true });
+    }
+    if (requestUrl.pathname === '/admin/api/check') {
+      return sendJson(res, 200, { authed: isAdminAuthed(req) });
+    }
+    if (requestUrl.pathname === '/admin/api/logout') {
+      const cookies = parseCookies(req);
+      const tok = cookies[ADMIN_COOKIE];
+      if (tok) adminTokens.delete(tok);
+      appendSetCookie(res, `${ADMIN_COOKIE}=; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=0`);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // All other /admin/api/* require auth
+    if (requestUrl.pathname.startsWith('/admin/api/')) {
+      if (!isAdminAuthed(req)) return sendJson(res, 401, { error: 'Not authorized' });
+
+      // Dashboard stats
+      if (requestUrl.pathname === '/admin/api/stats') {
+        const db = await ensureUsersDbFresh();
+        const totalUsers = Object.keys(db.users || {}).length;
+        const now = Date.now();
+        const signups24h = Object.values(db.users || {}).filter(u => u && typeof u.createdAt === 'number' && u.createdAt >= now - 86400000).length;
+        const visitStats = getVisitStats();
+        const tier1Count = Object.values(db.users || {}).filter(u => u && (u.tier === 1 || u.tier === '1')).length;
+        const tier2Count = Object.values(db.users || {}).filter(u => u && (u.tier === 2 || u.tier === '2')).length;
+        const paidCount = Object.values(db.users || {}).filter(u => u && u.purchaseDate).length;
+        const hourly = getHourlyVisitData();
+        return sendJson(res, 200, {
+          totalUsers, signups24h,
+          visits: visitStats,
+          activeNow: getActiveUsersNow(),
+          tier1Count, tier2Count, paidCount,
+          categoryHits: adminCategoryHits,
+          hourlyVisits: hourly,
+        });
+      }
+
+      // Recent signups
+      if (requestUrl.pathname === '/admin/api/signups') {
+        return sendJson(res, 200, { signups: adminSignupLog.slice().reverse() });
+      }
+
+      // Recent payments
+      if (requestUrl.pathname === '/admin/api/payments') {
+        return sendJson(res, 200, { payments: adminPaymentLog.slice().reverse() });
+      }
+
+      // Recent tier unlocks
+      if (requestUrl.pathname === '/admin/api/tiers') {
+        return sendJson(res, 200, { tiers: adminTierLog.slice().reverse() });
+      }
+
+      // List all users (paginated)
+      if (requestUrl.pathname === '/admin/api/users') {
+        const db = await ensureUsersDbFresh();
+        const q = (requestUrl.searchParams.get('q') || '').toLowerCase().trim();
+        const entries = Object.entries(db.users || {});
+        const filtered = q
+          ? entries.filter(([k, u]) => k.toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q))
+          : entries;
+        const page = Math.max(0, parseInt(requestUrl.searchParams.get('page') || '0', 10) || 0);
+        const perPage = 50;
+        const start = page * perPage;
+        const slice = filtered.slice(start, start + perPage);
+        const users = slice.map(([key, u]) => {
+          const ls = adminLastSeen.get(key);
+          return {
+            key, username: u.username || key, provider: u.provider || 'unknown',
+            tier: u.tier || 0, createdAt: u.createdAt || 0,
+            signupIp: u.signupIp || 'unknown',
+            referralCode: u.referralCode || null,
+            referredCount: Array.isArray(u.referredUsers) ? u.referredUsers.length : 0,
+            online: ls ? ls >= Date.now() - 5 * 60 * 1000 : false,
+            lastSeen: ls || null,
+          };
+        });
+        return sendJson(res, 200, { users, total: filtered.length, page, perPage });
+      }
+
+      // Single user detail
+      if (requestUrl.pathname === '/admin/api/user') {
+        const key = requestUrl.searchParams.get('key') || '';
+        if (!key) return sendJson(res, 400, { error: 'Missing key param' });
+        const db = await ensureUsersDbFresh();
+        const u = db.users[key];
+        if (!u) return sendJson(res, 404, { error: 'User not found' });
+        const ls = adminLastSeen.get(key);
+        const referred = (Array.isArray(u.referredUsers) ? u.referredUsers : []).map(rk => {
+          const ru = db.users[rk];
+          return { key: rk, username: ru ? (ru.username || rk) : rk };
+        });
+        return sendJson(res, 200, {
+          key,
+          username: u.username || key,
+          provider: u.provider || 'unknown',
+          tier: u.tier || 0,
+          createdAt: u.createdAt || null,
+          signupIp: u.signupIp || 'unknown',
+          referralCode: u.referralCode || null,
+          referredBy: u.referredBy || null,
+          referredUsers: referred,
+          purchaseMethod: u.purchaseMethod || null,
+          purchaseDate: u.purchaseDate || null,
+          premiumProvider: u.premiumProvider || null,
+          premiumPaidAt: u.premiumPaidAt || null,
+          online: ls ? ls >= Date.now() - 5 * 60 * 1000 : false,
+          lastSeen: ls || null,
+          salt: u.salt ? '(set)' : null,
+          hash: u.hash ? '(set)' : null,
+          discordId: u.discordId || null,
+          referralCreditIps: u.referralCreditIps || [],
+        });
+      }
+
+      // Update user tier
+      if (requestUrl.pathname === '/admin/api/user/set-tier') {
+        if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method Not Allowed' });
+        const body = await readJsonBody(req, res);
+        if (!body) return;
+        const key = String(body.key || '');
+        const newTier = parseInt(body.tier, 10);
+        if (!key) return sendJson(res, 400, { error: 'Missing key' });
+        if (![0, 1, 2].includes(newTier)) return sendJson(res, 400, { error: 'Tier must be 0, 1, or 2' });
+        const db = await ensureUsersDbFresh();
+        const u = db.users[key];
+        if (!u) return sendJson(res, 404, { error: 'User not found' });
+        u.tier = newTier === 0 ? null : newTier;
+        await queueUsersDbWrite();
+        return sendJson(res, 200, { ok: true, tier: u.tier });
+      }
+
+      // Delete user
+      if (requestUrl.pathname === '/admin/api/user/delete') {
+        if (req.method !== 'POST') return sendJson(res, 405, { error: 'Method Not Allowed' });
+        const body = await readJsonBody(req, res);
+        if (!body) return;
+        const key = String(body.key || '');
+        if (!key) return sendJson(res, 400, { error: 'Missing key' });
+        const db = await ensureUsersDbFresh();
+        if (!db.users[key]) return sendJson(res, 404, { error: 'User not found' });
+        delete db.users[key];
+        await queueUsersDbWrite();
+        // Also kill their sessions
+        for (const [tok, sess] of sessions.entries()) {
+          if (sess.userKey === key) sessions.delete(tok);
+        }
+        return sendJson(res, 200, { ok: true });
+      }
+
+      return sendJson(res, 404, { error: 'Unknown admin endpoint' });
+    }
 
     // ===== REFERRAL LANDING: /XXXXXXX =====
     // If someone visits a 7-char code path, store it in a cookie and redirect home.
@@ -1923,6 +2159,16 @@ const server = http.createServer(async (req, res) => {
         webhookReq.write(bodyBuf);
         webhookReq.end();
       } catch { /* non-critical */ }
+
+      // Admin payment log (store screenshot as base64 for admin panel)
+      try {
+        const thumbB64 = screenshotPart.data.slice(0, 200 * 1024).toString('base64'); // cap 200KB
+        adminPush(adminPaymentLog, {
+          ts: Date.now(), username, plan, method: payMethod,
+          screenshotB64: thumbB64, contentType: screenshotPart.contentType || 'image/png',
+          grantedTier,
+        }, 100);
+      } catch {}
 
       return sendJson(res, 200, { ok: true, grantedTier });
     }
@@ -2508,6 +2754,9 @@ const server = http.createServer(async (req, res) => {
       if (!folderDirName) {
         return sendJson(res, 400, { error: 'Invalid folder' });
       }
+
+      // Track category hit for admin
+      adminCategoryHits[folder] = (adminCategoryHits[folder] || 0) + 1;
 
       if (R2_ENABLED) {
         const names = await listMediaFilesForFolder(folder);
