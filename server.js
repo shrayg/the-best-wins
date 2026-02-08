@@ -866,33 +866,34 @@ function recordVisit(req) {
   while (visitLog.length > 0 && visitLog[0] < cutoff24h) visitLog.shift();
   scheduleVisitStatsPersist();
 
-  // Geo analytics: only from real page loads; ignore Railway internal IP.
+  // Geo: store all IPs (except Railway internal) and resolve country via geolocation.
   try {
     const ip = normalizeIp(getClientIp(req || {}));
-    if (ip && ip !== 'unknown' && ip !== '100.64.0.3') {
-      const rawCountry = String((req && req.headers && (req.headers['cf-ipcountry'] || req.headers['x-vercel-ip-country'] || req.headers['cloudfront-viewer-country'])) || '').trim();
-      const rawRegion = String((req && req.headers && (req.headers['cf-region'] || req.headers['x-vercel-ip-country-region'])) || '').trim();
-      const rawCity = String((req && req.headers && (req.headers['cf-ipcity'] || req.headers['x-vercel-ip-city'])) || '').trim();
+    if (!ip || ip === 'unknown' || GEO_IGNORE_IPS.has(ip)) return;
 
-      const country = rawCountry && rawCountry !== 'XX' ? rawCountry.toUpperCase() : '??';
-      adminGeo.countries[country] = (adminGeo.countries[country] || 0) + 1;
+    const cur = adminGeoIps[ip] || { count: 0, country: null, lastTs: 0 };
+    cur.count = Number(cur.count || 0) + 1;
+    cur.lastTs = now;
 
-      if (rawRegion) {
-        const rk = `${country}|${rawRegion}`;
-        adminGeo.regions[rk] = (adminGeo.regions[rk] || 0) + 1;
-      }
-      if (rawCity) {
-        const ck = `${country}|${rawRegion || ''}|${rawCity}`;
-        adminGeo.cities[ck] = (adminGeo.cities[ck] || 0) + 1;
-      }
+    const headerCountry = countryFromHeaders(req);
+    if (headerCountry) cur.country = headerCountry;
 
-      adminGeo.recent.push({ ts: now, ip, country, region: rawRegion || null, city: rawCity || null });
-      if (adminGeo.recent.length > 500) adminGeo.recent.shift();
-      scheduleAdminPersist();
+    adminGeoIps[ip] = cur;
+    geoPruneIfNeeded();
+    scheduleAdminPersist();
+
+    if (!cur.country) {
+      void geoLookupCountry(ip).then((code) => {
+        if (!code) return;
+        const e = adminGeoIps[ip];
+        if (!e) return;
+        if (!e.country) {
+          e.country = code;
+          scheduleAdminPersist();
+        }
+      }).catch(() => {});
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 }
 
 function getVisitStats() {
@@ -981,7 +982,10 @@ const adminPaymentLog   = []; // { ts, username, plan, method, screenshotB64 }
 const adminTierLog      = []; // { ts, username, tier }
 const adminCategoryHits = {}; // { 'Streamer Wins': 123, ... }
 const adminLastSeen     = new Map(); // userKey → timestamp (updated on every authed request)
-const adminGeo          = { countries: {}, regions: {}, cities: {}, recent: [] };
+const GEO_IGNORE_IPS = new Set(['100.64.0.3']);
+const GEO_MAX_IPS = 20000;
+const adminGeoIps = {}; // ip -> { count:number, country:string|null, lastTs:number }
+const geoLookupPending = new Map(); // ip -> Promise<string|null>
 
 function loadAdminDataFromDisk() {
   try {
@@ -1007,11 +1011,21 @@ function loadAdminDataFromDisk() {
         if (typeof v === 'number') adminLastSeen.set(k, v);
       }
     }
-    if (d.geo && typeof d.geo === 'object') {
-      adminGeo.countries = (d.geo.countries && typeof d.geo.countries === 'object') ? d.geo.countries : {};
-      adminGeo.regions = (d.geo.regions && typeof d.geo.regions === 'object') ? d.geo.regions : {};
-      adminGeo.cities = (d.geo.cities && typeof d.geo.cities === 'object') ? d.geo.cities : {};
-      adminGeo.recent = Array.isArray(d.geo.recent) ? d.geo.recent : [];
+    const geoIpsSrc = (d.geoIps && typeof d.geoIps === 'object')
+      ? d.geoIps
+      : (d.geo && typeof d.geo === 'object' && d.geo.ips && typeof d.geo.ips === 'object')
+        ? d.geo.ips
+        : null;
+    if (geoIpsSrc) {
+      for (const [ip, entry] of Object.entries(geoIpsSrc)) {
+        if (!ip || GEO_IGNORE_IPS.has(ip)) continue;
+        if (!entry || typeof entry !== 'object') continue;
+        const count = Number(entry.count || 0);
+        const lastTs = Number(entry.lastTs || 0);
+        const country = entry.country ? String(entry.country).toUpperCase() : null;
+        if (!Number.isFinite(count) || count <= 0) continue;
+        adminGeoIps[ip] = { count, lastTs: Number.isFinite(lastTs) ? lastTs : 0, country: country || null };
+      }
     }
     console.log(`Loaded admin analytics: ${adminSignupLog.length} signups, ${adminPaymentLog.length} payments, ${adminTierLog.length} tiers, ${Object.keys(adminCategoryHits).length} categories, ${adminLastSeen.size} lastSeen`);
   } catch (e) {
@@ -1037,11 +1051,21 @@ async function loadAdminDataFromR2() {
         if (typeof v === 'number') adminLastSeen.set(k, v);
       }
     }
-    if (d.geo && typeof d.geo === 'object') {
-      adminGeo.countries = (d.geo.countries && typeof d.geo.countries === 'object') ? d.geo.countries : {};
-      adminGeo.regions = (d.geo.regions && typeof d.geo.regions === 'object') ? d.geo.regions : {};
-      adminGeo.cities = (d.geo.cities && typeof d.geo.cities === 'object') ? d.geo.cities : {};
-      adminGeo.recent = Array.isArray(d.geo.recent) ? d.geo.recent : [];
+    const geoIpsSrc = (d.geoIps && typeof d.geoIps === 'object')
+      ? d.geoIps
+      : (d.geo && typeof d.geo === 'object' && d.geo.ips && typeof d.geo.ips === 'object')
+        ? d.geo.ips
+        : null;
+    if (geoIpsSrc) {
+      for (const [ip, entry] of Object.entries(geoIpsSrc)) {
+        if (!ip || GEO_IGNORE_IPS.has(ip)) continue;
+        if (!entry || typeof entry !== 'object') continue;
+        const count = Number(entry.count || 0);
+        const lastTs = Number(entry.lastTs || 0);
+        const country = entry.country ? String(entry.country).toUpperCase() : null;
+        if (!Number.isFinite(count) || count <= 0) continue;
+        adminGeoIps[ip] = { count, lastTs: Number.isFinite(lastTs) ? lastTs : 0, country: country || null };
+      }
     }
     console.log('Loaded admin analytics from R2');
     return true;
@@ -1061,7 +1085,7 @@ function buildAdminDataSnapshot() {
     tiers: adminTierLog,
     categoryHits: adminCategoryHits,
     lastSeen: lastSeenObj,
-    geo: adminGeo,
+    geoIps: adminGeoIps,
   });
 }
 
@@ -1115,12 +1139,83 @@ function getActiveUsersNow() {
   return count;
 }
 
-function getGeoSummary(maxRecent = 200, maxCountries = 50) {
-  const entries = Object.entries(adminGeo.countries || {});
-  entries.sort((a, b) => (Number(b[1]) || 0) - (Number(a[1]) || 0) || String(a[0]).localeCompare(String(b[0])));
-  const countries = entries.slice(0, maxCountries).map(([code, count]) => ({ code, count: Number(count) || 0 }));
-  const recent = Array.isArray(adminGeo.recent) ? adminGeo.recent.slice(-maxRecent).reverse() : [];
-  return { countries, recent };
+function geoPruneIfNeeded() {
+  const ips = Object.keys(adminGeoIps);
+  if (ips.length <= GEO_MAX_IPS) return;
+  ips.sort((a, b) => (adminGeoIps[a]?.lastTs || 0) - (adminGeoIps[b]?.lastTs || 0));
+  const remove = ips.length - GEO_MAX_IPS;
+  for (let i = 0; i < remove; i++) delete adminGeoIps[ips[i]];
+}
+
+function countryFromHeaders(req) {
+  const h = (req && req.headers) ? req.headers : {};
+  const raw = String(h['cf-ipcountry'] || h['x-vercel-ip-country'] || h['cloudfront-viewer-country'] || '').trim();
+  if (!raw || raw === 'XX') return null;
+  return raw.toUpperCase();
+}
+
+function geoLookupCountry(ip) {
+  if (!ip || ip === 'unknown' || GEO_IGNORE_IPS.has(ip)) return Promise.resolve(null);
+  if (geoLookupPending.has(ip)) return geoLookupPending.get(ip);
+
+  const p = new Promise((resolve) => {
+    try {
+      const url = new URL(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country_code`);
+      const rq = https.request(url, { method: 'GET', headers: { 'User-Agent': 'tbw-admin-geo' } }, (rs) => {
+        const chunks = [];
+        rs.on('data', (c) => chunks.push(c));
+        rs.on('end', () => {
+          try {
+            const body = Buffer.concat(chunks).toString('utf8');
+            const data = JSON.parse(body);
+            const ok = data && (data.success === true || data.success === 'true');
+            const code = ok && data.country_code ? String(data.country_code).toUpperCase() : null;
+            resolve(code || null);
+          } catch {
+            resolve(null);
+          }
+        });
+      });
+      rq.on('error', () => resolve(null));
+      rq.setTimeout(2500, () => {
+        try { rq.destroy(); } catch {}
+        resolve(null);
+      });
+      rq.end();
+    } catch {
+      resolve(null);
+    }
+  }).finally(() => {
+    geoLookupPending.delete(ip);
+  });
+
+  geoLookupPending.set(ip, p);
+  return p;
+}
+
+function computeGeoTopCountries() {
+  const counts = {};
+  let total = 0;
+
+  for (const [ip, entry] of Object.entries(adminGeoIps)) {
+    if (!ip || !entry) continue;
+    if (GEO_IGNORE_IPS.has(ip)) continue;
+    const n = Number(entry.count || 0);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const c = entry.country ? String(entry.country).toUpperCase() : '??';
+    counts[c] = (counts[c] || 0) + n;
+    total += n;
+  }
+
+  const sorted = Object.entries(counts)
+    .map(([country, count]) => ({ country, count: Number(count) || 0 }))
+    .sort((a, b) => b.count - a.count || a.country.localeCompare(b.country));
+
+  const top = sorted.slice(0, 10);
+  const topSum = top.reduce((a, e) => a + e.count, 0);
+  const other = Math.max(0, total - topSum);
+
+  return { total, top, other };
 }
 
 function planAmountCents(plan) {
@@ -1914,13 +2009,13 @@ const server = http.createServer(async (req, res) => {
           categoryHits: adminCategoryHits,
           hourlyVisits: hourly,
           chart,
-          geo: getGeoSummary(),
         });
       }
 
       // Geo analytics
       if (requestUrl.pathname === '/admin/api/geo') {
-        return sendJson(res, 200, { geo: getGeoSummary(500, 200) });
+        const g = computeGeoTopCountries();
+        return sendJson(res, 200, { geo: g });
       }
 
       // Recent signups
