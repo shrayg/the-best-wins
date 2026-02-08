@@ -924,6 +924,61 @@ function getHourlyVisitData() {
   return { labels, data: buckets };
 }
 
+/**
+ * Flexible visit chart data for admin panel.
+ * @param {'30m'|'1h'|'4h'|'24h'|'alltime'} range
+ */
+function getVisitChartData(range) {
+  const now = Date.now();
+  const RANGES = {
+    '30m':  { ms: 30 * 60000,       buckets: 30,  bucketMs: 60000,        labelFn: (i, n) => i % 5 === 0 ? `-${n - i}m` : '' },
+    '1h':   { ms: 3600000,          buckets: 30,  bucketMs: 120000,       labelFn: (i, n) => i % 5 === 0 ? `-${(n - i) * 2}m` : '' },
+    '4h':   { ms: 4 * 3600000,      buckets: 24,  bucketMs: 10 * 60000,   labelFn: (i, n) => i % 4 === 0 ? `-${((n - i) * 10)}m` : '' },
+    '24h':  { ms: 86400000,         buckets: 24,  bucketMs: 3600000,      labelFn: (i, n) => { const h = n - 1 - i; return h === 0 ? 'Now' : `-${h}h`; } },
+    'alltime': null,
+  };
+  if (range === 'alltime') {
+    // Build daily buckets for last 7 days from visitLog, plus an all-time total card
+    const days = 7;
+    const dayMs = 86400000;
+    const buckets = new Array(days).fill(0);
+    for (let i = visitLog.length - 1; i >= 0; i--) {
+      const age = now - visitLog[i];
+      if (age > days * dayMs) break;
+      const d = Math.floor(age / dayMs);
+      if (d < days) buckets[days - 1 - d]++;
+    }
+    const labels = [];
+    for (let i = 0; i < days; i++) {
+      const d = days - 1 - i;
+      labels.push(d === 0 ? 'Today' : d === 1 ? 'Yesterday' : `-${d}d`);
+    }
+    // Count visits in the time range
+    const cutoff = now - days * dayMs;
+    let total = 0;
+    for (let i = visitLog.length - 1; i >= 0; i--) {
+      if (visitLog[i] < cutoff) break;
+      total++;
+    }
+    return { labels, data: buckets, rangeLabel: 'Last 7 Days', rangeTotal: total, allTime: visitAllTime };
+  }
+
+  const cfg = RANGES[range] || RANGES['24h'];
+  const buckets = new Array(cfg.buckets).fill(0);
+  const cutoff = now - cfg.ms;
+  let total = 0;
+  for (let i = visitLog.length - 1; i >= 0; i--) {
+    const t = visitLog[i];
+    if (t < cutoff) break;
+    total++;
+    const bucketIdx = Math.min(cfg.buckets - 1, Math.floor((now - t) / cfg.bucketMs));
+    buckets[cfg.buckets - 1 - bucketIdx]++;
+  }
+  const labels = [];
+  for (let i = 0; i < cfg.buckets; i++) labels.push(cfg.labelFn(i, cfg.buckets));
+  return { labels, data: buckets, rangeLabel: range, rangeTotal: total, allTime: visitAllTime };
+}
+
 function isAdminAuthed(req) {
   const cookies = parseCookies(req);
   const tok = cookies[ADMIN_COOKIE];
@@ -1616,6 +1671,8 @@ const server = http.createServer(async (req, res) => {
         const tier2Count = Object.values(db.users || {}).filter(u => u && (u.tier === 2 || u.tier === '2')).length;
         const paidCount = Object.values(db.users || {}).filter(u => u && u.purchaseDate).length;
         const hourly = getHourlyVisitData();
+        const chartRange = requestUrl.searchParams.get('chart') || '24h';
+        const chart = getVisitChartData(chartRange);
         return sendJson(res, 200, {
           totalUsers, signups24h,
           visits: visitStats,
@@ -1623,6 +1680,7 @@ const server = http.createServer(async (req, res) => {
           tier1Count, tier2Count, paidCount,
           categoryHits: adminCategoryHits,
           hourlyVisits: hourly,
+          chart,
         });
       }
 

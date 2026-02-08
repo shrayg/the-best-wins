@@ -3,128 +3,181 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Panel — The Best Wins</title>
+<title>Admin — The Best Wins</title>
 <meta name="robots" content="noindex, nofollow">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#0a0a0f;--card:#12121a;--border:#1e1e2e;--accent:#7c3aed;--accent2:#22d3ee;--text:#e2e2e8;--text2:#8888a0;--red:#ef4444;--green:#22c55e;--gold:#ffd700;--orange:#f97316}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-a{color:var(--accent2);text-decoration:none}
+:root{
+  --bg:#06060b;--bg2:#0c0c14;--card:#111119;--card2:#16161f;
+  --border:#1c1c2e;--border2:#252540;
+  --accent:#7c3aed;--accent-dim:rgba(124,58,237,.15);--accent-glow:rgba(124,58,237,.25);
+  --cyan:#22d3ee;--cyan-dim:rgba(34,211,238,.12);
+  --text:#e8e8f0;--text2:#6e6e88;--text3:#44445a;
+  --red:#ef4444;--red-dim:rgba(239,68,68,.12);
+  --green:#22c55e;--green-dim:rgba(34,197,94,.12);
+  --gold:#fbbf24;--gold-dim:rgba(251,191,36,.12);
+  --orange:#f97316;--orange-dim:rgba(249,115,22,.12);
+  --radius:10px;--radius-lg:14px;
+}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased}
+a{color:var(--cyan);text-decoration:none}
 button{cursor:pointer;font-family:inherit}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-/* Login screen */
-#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
-.login-box{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:40px;max-width:380px;width:100%;text-align:center}
-.login-box h1{font-size:1.5rem;margin-bottom:8px}
-.login-box p{color:var(--text2);margin-bottom:24px;font-size:0.9rem}
-.login-box input{width:100%;padding:12px 16px;background:#1a1a26;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:1rem;margin-bottom:16px;outline:none}
-.login-box input:focus{border-color:var(--accent)}
-.login-box button{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;transition:background .2s}
-.login-box button:hover{background:#6d28d9}
-.login-error{color:var(--red);font-size:0.85rem;margin-top:8px;display:none}
+/* ── Login ────────────────────────────────────────────────────────── */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;background:radial-gradient(ellipse at 50% 0%,rgba(124,58,237,.08) 0%,transparent 60%)}
+.login-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:48px 40px;max-width:400px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.login-box .logo{width:48px;height:48px;background:var(--accent);border-radius:12px;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:800;color:#fff}
+.login-box h1{font-size:1.4rem;margin-bottom:6px;font-weight:700}
+.login-box p{color:var(--text2);margin-bottom:28px;font-size:0.85rem}
+.login-box input{width:100%;padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.95rem;margin-bottom:16px;outline:none;transition:border .2s}
+.login-box input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.login-box button{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),#6d28d9);color:#fff;border:none;border-radius:8px;font-size:.95rem;font-weight:600;transition:opacity .2s;letter-spacing:.3px}
+.login-box button:hover{opacity:.9}
+.login-error{color:var(--red);font-size:.82rem;margin-top:10px;display:none}
 
-/* Dashboard */
-#dashboard{display:none;padding:20px;max-width:1400px;margin:0 auto}
-.dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
-.dash-header h1{font-size:1.6rem;font-weight:700}
-.dash-header .right{display:flex;gap:12px;align-items:center}
-.btn-sm{padding:8px 16px;border-radius:6px;border:none;font-size:0.85rem;font-weight:600;transition:.2s}
-.btn-accent{background:var(--accent);color:#fff}.btn-accent:hover{background:#6d28d9}
-.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}.btn-outline:hover{border-color:var(--accent);color:var(--text)}
-.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#dc2626}
+/* ── Layout ───────────────────────────────────────────────────────── */
+#dashboard{display:none}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--card);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;z-index:100}
+.sidebar .brand{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.sidebar .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+.sidebar .brand span{font-weight:700;font-size:.95rem}
+.sidebar nav{flex:1;display:flex;flex-direction:column;gap:2px;padding:0 8px}
+.nav-btn{display:flex;align-items:center;gap:10px;padding:10px 14px;border:none;background:transparent;color:var(--text2);font-size:.85rem;border-radius:8px;transition:.15s;width:100%;text-align:left;font-weight:500}
+.nav-btn:hover{background:rgba(255,255,255,.03);color:var(--text)}
+.nav-btn.active{background:var(--accent-dim);color:var(--accent);font-weight:600}
+.nav-btn .nav-icon{width:18px;text-align:center;font-size:1rem;flex-shrink:0}
+.sidebar-footer{padding:12px 20px;border-top:1px solid var(--border);margin-top:auto}
+.sidebar-footer button{width:100%;padding:8px;background:rgba(239,68,68,.08);color:var(--red);border:1px solid rgba(239,68,68,.15);border-radius:6px;font-size:.8rem;font-weight:500;transition:.15s}
+.sidebar-footer button:hover{background:rgba(239,68,68,.15)}
+.main{margin-left:220px;padding:24px 28px;min-height:100vh}
 
-/* Stat cards */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:24px}
-.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden}
-.stat-card .label{font-size:0.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
-.stat-card .value{font-size:2rem;font-weight:700}
-.stat-card .sub{font-size:0.8rem;color:var(--text2);margin-top:4px}
-.stat-card.accent .value{color:var(--accent)}
-.stat-card.cyan .value{color:var(--accent2)}
-.stat-card.green .value{color:var(--green)}
-.stat-card.gold .value{color:var(--gold)}
-.stat-card.orange .value{color:var(--orange)}
+/* ── Top Bar ──────────────────────────────────────────────────────── */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.topbar h1{font-size:1.3rem;font-weight:700}
+.topbar .meta{display:flex;align-items:center;gap:16px}
+.topbar .live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;box-shadow:0 0 6px var(--green)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar .meta span{font-size:.8rem;color:var(--text2)}
+.btn{padding:8px 16px;border-radius:6px;border:none;font-size:.82rem;font-weight:600;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#6d28d9}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
 
-/* Chart */
-.chart-section{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:24px}
-.chart-section h3{font-size:1rem;margin-bottom:12px;color:var(--text2)}
-.chart-wrap{height:200px;position:relative}
+/* ── Stat Cards ───────────────────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;transition:border .2s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.c-accent::before{background:var(--accent)}.stat-card.c-cyan::before{background:var(--cyan)}
+.stat-card.c-green::before{background:var(--green)}.stat-card.c-gold::before{background:var(--gold)}
+.stat-card.c-orange::before{background:var(--orange)}.stat-card.c-red::before{background:var(--red)}
+.stat-card .s-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:10px}
+.stat-card.c-accent .s-icon{background:var(--accent-dim);color:var(--accent)}
+.stat-card.c-cyan .s-icon{background:var(--cyan-dim);color:var(--cyan)}
+.stat-card.c-green .s-icon{background:var(--green-dim);color:var(--green)}
+.stat-card.c-gold .s-icon{background:var(--gold-dim);color:var(--gold)}
+.stat-card.c-orange .s-icon{background:var(--orange-dim);color:var(--orange)}
+.stat-card.c-red .s-icon{background:var(--red-dim);color:var(--red)}
+.stat-card .s-label{font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px;font-weight:600}
+.stat-card .s-value{font-size:1.8rem;font-weight:800;line-height:1.1;letter-spacing:-.5px}
+.stat-card .s-sub{font-size:.72rem;color:var(--text3);margin-top:4px}
+
+/* ── Chart ────────────────────────────────────────────────────────── */
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px;margin-bottom:24px}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.chart-header h3{font-size:.95rem;font-weight:600;display:flex;align-items:center;gap:8px}
+.chart-header h3 .chart-total{font-size:.75rem;color:var(--text2);font-weight:500;background:var(--bg);padding:2px 8px;border-radius:20px}
+.range-btns{display:flex;gap:4px;background:var(--bg);border-radius:8px;padding:3px}
+.range-btn{padding:6px 14px;border:none;background:transparent;color:var(--text2);font-size:.75rem;font-weight:600;border-radius:6px;transition:.15s;letter-spacing:.3px}
+.range-btn.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(124,58,237,.3)}
+.range-btn:hover:not(.active){color:var(--text);background:rgba(255,255,255,.04)}
+.chart-wrap{height:220px;position:relative}
 canvas{width:100%!important;height:100%!important}
 
-/* Tabs */
-.tab-bar{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0;flex-wrap:wrap}
-.tab-btn{padding:10px 20px;background:transparent;color:var(--text2);border:none;border-bottom:2px solid transparent;font-size:0.9rem;font-weight:500;transition:.2s}
-.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
-.tab-btn:hover{color:var(--text)}
-.tab-panel{display:none}.tab-panel.active{display:block}
+/* ── Sections / Panels ────────────────────────────────────────────── */
+.page{display:none}.page.active{display:block}
+.section-title{font-size:.95rem;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section-title .count-badge{font-size:.72rem;background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:20px;font-weight:600}
 
-/* Tables */
-.table-wrap{overflow-x:auto;background:var(--card);border:1px solid var(--border);border-radius:10px}
-table{width:100%;border-collapse:collapse;font-size:0.85rem}
-th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border)}
-th{color:var(--text2);font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;background:rgba(255,255,255,0.02)}
+/* ── Tables ───────────────────────────────────────────────────────── */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th,td{text-align:left;padding:11px 16px;border-bottom:1px solid var(--border)}
+th{color:var(--text2);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.7px;background:var(--bg2);position:sticky;top:0}
 tr:last-child td{border-bottom:none}
-tr:hover td{background:rgba(255,255,255,0.02)}
-.badge{display:inline-block;padding:2px 8px;border-radius:50px;font-size:0.75rem;font-weight:600}
-.badge-green{background:rgba(34,197,94,0.15);color:var(--green)}
-.badge-red{background:rgba(239,68,68,0.15);color:var(--red)}
-.badge-gold{background:rgba(255,215,0,0.15);color:var(--gold)}
-.badge-purple{background:rgba(124,58,237,0.15);color:var(--accent)}
-.badge-cyan{background:rgba(34,211,238,0.15);color:var(--accent2)}
-.badge-gray{background:rgba(136,136,160,0.15);color:var(--text2)}
+tr:hover td{background:rgba(255,255,255,.015)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:600}
+.b-green{background:var(--green-dim);color:var(--green)}
+.b-red{background:var(--red-dim);color:var(--red)}
+.b-gold{background:var(--gold-dim);color:var(--gold)}
+.b-purple{background:var(--accent-dim);color:var(--accent)}
+.b-cyan{background:var(--cyan-dim);color:var(--cyan)}
+.b-gray{background:rgba(100,100,120,.12);color:var(--text2)}
+.b-orange{background:var(--orange-dim);color:var(--orange)}
 
-/* User search */
-.search-bar{display:flex;gap:8px;margin-bottom:16px}
-.search-bar input{flex:1;padding:10px 14px;background:#1a1a26;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;outline:none}
-.search-bar input:focus{border-color:var(--accent)}
-.search-bar button{padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:600}
+/* ── Search ───────────────────────────────────────────────────────── */
+.search-row{display:flex;gap:8px;margin-bottom:16px}
+.search-row input{flex:1;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;outline:none;transition:.2s}
+.search-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.search-row button{padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:.85rem}
 
-/* User detail modal */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10000;align-items:center;justify-content:center;padding:20px}
+/* ── User Modal ───────────────────────────────────────────────────── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);z-index:10000;align-items:center;justify-content:center;padding:20px}
 .modal-overlay.active{display:flex}
-.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:680px;width:100%;max-height:85vh;overflow-y:auto;padding:28px}
-.modal h2{font-size:1.3rem;margin-bottom:20px;display:flex;align-items:center;gap:12px}
-.modal-close{margin-left:auto;background:none;border:none;color:var(--text2);font-size:1.5rem;cursor:pointer}
-.modal-close:hover{color:var(--text)}
-.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
-.detail-item{padding:12px;background:rgba(255,255,255,0.02);border-radius:8px}
-.detail-item .dlabel{font-size:0.75rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:4px}
-.detail-item .dvalue{font-size:0.95rem;word-break:break-all}
-.detail-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-.tier-select{padding:8px 12px;background:#1a1a26;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.85rem}
-.referred-list{margin-top:12px}
-.referred-list h4{font-size:0.85rem;color:var(--text2);margin-bottom:8px}
-.referred-list ul{list-style:none;font-size:0.85rem}
-.referred-list li{padding:4px 0;border-bottom:1px solid var(--border)}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:720px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+.modal-header h2{font-size:1.1rem;font-weight:700;display:flex;align-items:center;gap:10px}
+.modal-close{background:none;border:none;color:var(--text2);font-size:1.3rem;width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:.15s}
+.modal-close:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.modal-body{padding:24px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.detail-item{padding:12px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)}
+.detail-item .dl{font-size:.68rem;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-weight:600}
+.detail-item .dv{font-size:.88rem;word-break:break-all}
+.modal-actions{display:flex;gap:10px;flex-wrap:wrap;padding:16px 24px;border-top:1px solid var(--border);background:var(--bg2)}
+.tier-select{padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.82rem}
+.referred-list{margin-top:14px}
+.referred-list h4{font-size:.78rem;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.referred-list ul{list-style:none;font-size:.82rem}
+.referred-list li{padding:5px 0;border-bottom:1px solid var(--border)}
+.referred-list li:last-child{border:none}
 
-/* Category bars */
-.cat-bars{display:flex;flex-direction:column;gap:8px}
-.cat-bar{display:flex;align-items:center;gap:10px}
-.cat-bar .cat-name{width:130px;font-size:0.85rem;color:var(--text2);text-align:right;flex-shrink:0}
-.cat-bar .bar-bg{flex:1;height:28px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;position:relative}
-.cat-bar .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px;transition:width .5s;display:flex;align-items:center;padding:0 8px;font-size:0.75rem;font-weight:600;min-width:fit-content}
+/* ── Category Bars ────────────────────────────────────────────────── */
+.cat-bars{display:flex;flex-direction:column;gap:10px}
+.cat-bar{display:flex;align-items:center;gap:12px}
+.cat-bar .cat-name{width:120px;font-size:.82rem;color:var(--text2);text-align:right;flex-shrink:0;font-weight:500}
+.cat-bar .bar-track{flex:1;height:32px;background:var(--bg);border-radius:8px;overflow:hidden;position:relative;border:1px solid var(--border)}
+.cat-bar .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--cyan));border-radius:7px;transition:width .6s ease;display:flex;align-items:center;padding:0 10px;font-size:.72rem;font-weight:700;min-width:fit-content}
 
-/* Screenshots */
-.screenshot-thumb{max-width:120px;max-height:80px;border-radius:6px;cursor:pointer;border:1px solid var(--border)}
-.screenshot-thumb:hover{border-color:var(--accent)}
-.ss-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:20000;align-items:center;justify-content:center;cursor:pointer}
+/* ── Screenshot ───────────────────────────────────────────────────── */
+.screenshot-thumb{max-width:100px;max-height:64px;border-radius:6px;cursor:pointer;border:1px solid var(--border);transition:.15s}
+.screenshot-thumb:hover{border-color:var(--accent);transform:scale(1.05)}
+.ss-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:20000;align-items:center;justify-content:center;cursor:pointer}
 .ss-modal.active{display:flex}
-.ss-modal img{max-width:90vw;max-height:90vh;border-radius:8px}
+.ss-modal img{max-width:90vw;max-height:90vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 
-/* Status dot */
-.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
-.dot-green{background:var(--green)}
-.dot-gray{background:#555}
-
-/* Responsive */
-@media(max-width:600px){
+/* ── Misc ─────────────────────────────────────────────────────────── */
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px;flex-shrink:0}
+.dot-on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot-off{background:var(--text3)}
+.pagination{display:flex;gap:8px;margin-top:14px;align-items:center}
+.pagination span{font-size:.8rem;color:var(--text2)}
+.empty-row td{text-align:center!important;padding:40px 16px;color:var(--text3);font-size:.85rem}
+@media(max-width:768px){
+  .sidebar{display:none}
+  .main{margin-left:0;padding:16px}
   .stat-grid{grid-template-columns:1fr 1fr}
   .detail-grid{grid-template-columns:1fr}
-  .cat-bar .cat-name{width:90px;font-size:0.75rem}
+  .chart-wrap{height:160px}
+  .mobile-nav{display:flex!important}
 }
-
-/* Refresh indicator */
-.refresh-spin{animation:spin 1s linear infinite}
+.mobile-nav{display:none;overflow-x:auto;gap:4px;padding:0 0 16px;margin-bottom:8px}
+.mobile-nav .nav-btn{white-space:nowrap;flex-shrink:0}
+@keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.stat-card,.chart-card,.table-card{animation:fadein .3s ease}
+.spin{animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -133,505 +186,431 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <!-- Login Screen -->
 <div id="login-screen">
   <div class="login-box">
+    <div class="logo">TBW</div>
     <h1>Admin Panel</h1>
-    <p>The Best Wins — Dashboard</p>
-    <input type="password" id="admin-pw" placeholder="Enter password" autocomplete="off">
-    <button id="admin-login-btn">Login</button>
-    <div class="login-error" id="login-error">Wrong password</div>
+    <p>Enter password to continue</p>
+    <input type="password" id="admin-pw" placeholder="Password" autocomplete="off">
+    <button id="admin-login-btn">Sign In</button>
+    <div class="login-error" id="login-error">Invalid password</div>
   </div>
 </div>
 
 <!-- Dashboard -->
 <div id="dashboard">
-  <div class="dash-header">
-    <h1>Dashboard</h1>
-    <div class="right">
-      <button class="btn-sm btn-outline" id="refresh-btn" title="Refresh data">&#x21bb; Refresh</button>
-      <button class="btn-sm btn-outline" id="logout-btn">Logout</button>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="dot dot-on"></div><span>TBW Admin</span></div>
+    <nav>
+      <button class="nav-btn active" data-page="overview"><span class="nav-icon">📊</span> Overview</button>
+      <button class="nav-btn" data-page="signups"><span class="nav-icon">✅</span> Signups</button>
+      <button class="nav-btn" data-page="payments"><span class="nav-icon">💰</span> Payments</button>
+      <button class="nav-btn" data-page="tiers"><span class="nav-icon">🏆</span> Tier Unlocks</button>
+      <button class="nav-btn" data-page="categories"><span class="nav-icon">📁</span> Categories</button>
+      <button class="nav-btn" data-page="users"><span class="nav-icon">👥</span> Users</button>
+    </nav>
+    <div class="sidebar-footer">
+      <button id="logout-btn">Sign Out</button>
     </div>
-  </div>
+  </aside>
 
-  <!-- Stat Cards -->
-  <div class="stat-grid" id="stat-grid"></div>
-
-  <!-- Visit Chart -->
-  <div class="chart-section">
-    <h3>Visits — Last 24 Hours</h3>
-    <div class="chart-wrap">
-      <canvas id="visit-chart"></canvas>
+  <!-- Main -->
+  <div class="main">
+    <!-- Mobile nav -->
+    <div class="mobile-nav">
+      <button class="nav-btn active" data-page="overview">📊 Overview</button>
+      <button class="nav-btn" data-page="signups">✅ Signups</button>
+      <button class="nav-btn" data-page="payments">💰 Payments</button>
+      <button class="nav-btn" data-page="tiers">🏆 Tiers</button>
+      <button class="nav-btn" data-page="categories">📁 Categories</button>
+      <button class="nav-btn" data-page="users">👥 Users</button>
     </div>
-  </div>
 
-  <!-- Tabs -->
-  <div class="tab-bar" id="tab-bar">
-    <button class="tab-btn active" data-tab="signups">Signups</button>
-    <button class="tab-btn" data-tab="payments">Payments</button>
-    <button class="tab-btn" data-tab="tiers">Tier Unlocks</button>
-    <button class="tab-btn" data-tab="categories">Categories</button>
-    <button class="tab-btn" data-tab="users">Users</button>
-  </div>
+    <!-- Topbar -->
+    <div class="topbar">
+      <h1 id="page-title">Overview</h1>
+      <div class="meta">
+        <div class="live-dot"></div>
+        <span id="last-updated">—</span>
+        <button class="btn btn-ghost" id="refresh-btn">↻ Refresh</button>
+      </div>
+    </div>
 
-  <!-- Signups Tab -->
-  <div class="tab-panel active" id="tab-signups">
-    <div class="table-wrap">
-      <table>
+    <!-- Overview Page -->
+    <div class="page active" id="page-overview">
+      <div class="stat-grid" id="stat-grid"></div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3>Visits <span class="chart-total" id="chart-total"></span></h3>
+          <div class="range-btns" id="range-btns">
+            <button class="range-btn" data-range="30m">30m</button>
+            <button class="range-btn" data-range="1h">1h</button>
+            <button class="range-btn" data-range="4h">4h</button>
+            <button class="range-btn active" data-range="24h">24h</button>
+            <button class="range-btn" data-range="alltime">All Time</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="visit-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Signups Page -->
+    <div class="page" id="page-signups">
+      <div class="section-title">Recent Signups <span class="count-badge" id="signup-count">0</span></div>
+      <div class="table-card"><table>
         <thead><tr><th>Time</th><th>Username</th><th>Provider</th><th>IP</th><th>Referred By</th></tr></thead>
         <tbody id="signups-body"></tbody>
-      </table>
+      </table></div>
     </div>
-  </div>
 
-  <!-- Payments Tab -->
-  <div class="tab-panel" id="tab-payments">
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Time</th><th>User</th><th>Plan</th><th>Method</th><th>Tier Granted</th><th>Screenshot</th></tr></thead>
+    <!-- Payments Page -->
+    <div class="page" id="page-payments">
+      <div class="section-title">Payment Screenshots <span class="count-badge" id="payment-count">0</span></div>
+      <div class="table-card"><table>
+        <thead><tr><th>Time</th><th>User</th><th>Plan</th><th>Method</th><th>Tier</th><th>Screenshot</th></tr></thead>
         <tbody id="payments-body"></tbody>
-      </table>
+      </table></div>
     </div>
-  </div>
 
-  <!-- Tier Unlocks Tab -->
-  <div class="tab-panel" id="tab-tiers">
-    <div class="table-wrap">
-      <table>
+    <!-- Tiers Page -->
+    <div class="page" id="page-tiers">
+      <div class="section-title">Tier Unlocks <span class="count-badge" id="tier-count">0</span></div>
+      <div class="table-card"><table>
         <thead><tr><th>Time</th><th>Username</th><th>Tier</th></tr></thead>
         <tbody id="tiers-body"></tbody>
-      </table>
+      </table></div>
     </div>
-  </div>
 
-  <!-- Categories Tab -->
-  <div class="tab-panel" id="tab-categories">
-    <h3 style="margin-bottom:16px;color:var(--text2)">Most Visited Categories (since server restart)</h3>
-    <div class="cat-bars" id="cat-bars"></div>
-  </div>
-
-  <!-- Users Tab -->
-  <div class="tab-panel" id="tab-users">
-    <div class="search-bar">
-      <input type="text" id="user-search" placeholder="Search by username or key...">
-      <button id="user-search-btn">Search</button>
+    <!-- Categories Page -->
+    <div class="page" id="page-categories">
+      <div class="section-title">Most Visited Categories</div>
+      <div class="chart-card"><div class="cat-bars" id="cat-bars"></div></div>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>Status</th><th>Username</th><th>Provider</th><th>Tier</th><th>Referrals</th><th>Signup IP</th><th>Created</th><th></th></tr></thead>
+
+    <!-- Users Page -->
+    <div class="page" id="page-users">
+      <div class="search-row">
+        <input type="text" id="user-search" placeholder="Search by username or key...">
+        <button id="user-search-btn">Search</button>
+      </div>
+      <div class="table-card"><table>
+        <thead><tr><th>Status</th><th>Username</th><th>Provider</th><th>Tier</th><th>Referrals</th><th>IP</th><th>Created</th><th></th></tr></thead>
         <tbody id="users-body"></tbody>
-      </table>
+      </table></div>
+      <div class="pagination" id="users-pagination"></div>
     </div>
-    <div style="display:flex;gap:10px;margin-top:12px;align-items:center" id="users-pagination"></div>
   </div>
 </div>
 
 <!-- User Detail Modal -->
-<div class="modal-overlay" id="user-modal">
-  <div class="modal" id="user-modal-content"></div>
-</div>
-
+<div class="modal-overlay" id="user-modal"><div class="modal" id="user-modal-content"></div></div>
 <!-- Screenshot Lightbox -->
-<div class="ss-modal" id="ss-modal">
-  <img id="ss-modal-img" src="" alt="screenshot">
-</div>
+<div class="ss-modal" id="ss-modal"><img id="ss-modal-img" src="" alt="screenshot"></div>
 
 <script>
-// roundRect polyfill for older browsers
-if (!CanvasRenderingContext2D.prototype.roundRect) {
-  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
-    const r = Array.isArray(radii) ? radii[0] || 0 : radii || 0;
-    this.moveTo(x + r, y);
-    this.lineTo(x + w - r, y);
-    this.arcTo(x + w, y, x + w, y + r, r);
-    this.lineTo(x + w, y + h);
-    this.lineTo(x, y + h);
-    this.lineTo(x, y + r);
-    this.arcTo(x, y, x + r, y, r);
-    this.closePath();
-  };
+// roundRect polyfill
+if(!CanvasRenderingContext2D.prototype.roundRect){CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){r=Array.isArray(r)?r[0]||0:r||0;this.moveTo(x+r,y);this.lineTo(x+w-r,y);this.arcTo(x+w,y,x+w,y+r,r);this.lineTo(x+w,y+h);this.lineTo(x,y+h);this.lineTo(x,y+r);this.arcTo(x,y,x+r,y,r);this.closePath()}}
+
+;(function(){
+const $=(s,c)=>(c||document).querySelector(s);
+const $$=(s,c)=>[...(c||document).querySelectorAll(s)];
+const PLAN_LABELS={tier1:'Tier 1 — $5.99',premium:'Premium — $9.99'};
+const METHOD_LABELS={paypal:'PayPal',cashapp:'Cash App',zelle:'Zelle',venmo:'Venmo',applepay:'Apple Pay'};
+
+function timeAgo(ts){if(!ts)return'—';const s=Math.floor((Date.now()-ts)/1000);if(s<60)return s+'s ago';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago'}
+function fmtDate(ts){if(!ts)return'—';return new Date(ts).toLocaleString()}
+function fmtNum(n){return(n||0).toLocaleString()}
+function tierBadge(t){if(t===2)return'<span class="badge b-gold">★ Premium</span>';if(t===1)return'<span class="badge b-purple">Tier 1</span>';return'<span class="badge b-gray">Free</span>'}
+function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+async function checkAuth(){try{const r=await fetch('/admin/api/check');const d=await r.json();if(d.authed)showDashboard();else showLogin()}catch{showLogin()}}
+function showLogin(){$('#login-screen').style.display='flex';$('#dashboard').style.display='none'}
+function showDashboard(){$('#login-screen').style.display='none';$('#dashboard').style.display='block';loadAll()}
+$('#admin-login-btn').addEventListener('click',doLogin);
+$('#admin-pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+async function doLogin(){const pw=$('#admin-pw').value;const r=await fetch('/admin/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});if(r.ok)showDashboard();else{$('#login-error').style.display='block';$('#admin-pw').value='';$('#admin-pw').focus()}}
+$('#logout-btn').addEventListener('click',async()=>{await fetch('/admin/api/logout',{method:'POST'});showLogin()});
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+const PAGE_TITLES={overview:'Overview',signups:'Signups',payments:'Payments',tiers:'Tier Unlocks',categories:'Categories',users:'Users'};
+$$('.nav-btn[data-page]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const pg=btn.dataset.page;
+    $$('.nav-btn').forEach(b=>b.classList.remove('active'));
+    $$(`.nav-btn[data-page="${pg}"]`).forEach(b=>b.classList.add('active'));
+    $$('.page').forEach(p=>p.classList.remove('active'));
+    $(`#page-${pg}`).classList.add('active');
+    $('#page-title').textContent=PAGE_TITLES[pg]||pg;
+  });
+});
+
+// ── Data Loading ─────────────────────────────────────────────────────────────
+let refreshing=false;
+let chartRange='24h';
+async function loadAll(){
+  if(refreshing)return;refreshing=true;
+  const btn=$('#refresh-btn');btn.innerHTML='<span class="spin" style="display:inline-block">↻</span>';
+  try{await Promise.all([loadStats(),loadSignups(),loadPayments(),loadTiers(),loadUsers()])}catch(e){console.error(e)}
+  btn.innerHTML='↻ Refresh';
+  $('#last-updated').textContent='Updated '+new Date().toLocaleTimeString();
+  refreshing=false;
 }
-(function() {
-  const $ = (s, c) => (c || document).querySelector(s);
-  const $$ = (s, c) => [...(c || document).querySelectorAll(s)];
-  const PLAN_LABELS = { tier1: 'Tier 1 — $5.99', premium: 'Premium — $9.99' };
-  const METHOD_LABELS = { paypal: 'PayPal', cashapp: 'Cash App', zelle: 'Zelle', venmo: 'Venmo', applepay: 'Apple Pay' };
+$('#refresh-btn').addEventListener('click',loadAll);
+setInterval(()=>{if($('#dashboard').style.display!=='none')loadAll()},30000);
 
-  function timeAgo(ts) {
-    if (!ts) return '—';
-    const s = Math.floor((Date.now() - ts) / 1000);
-    if (s < 60) return s + 's ago';
-    if (s < 3600) return Math.floor(s / 60) + 'm ago';
-    if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-    return Math.floor(s / 86400) + 'd ago';
-  }
-  function fmtDate(ts) {
-    if (!ts) return '—';
-    return new Date(ts).toLocaleString();
-  }
-  function tierBadge(t) {
-    if (t === 2) return '<span class="badge badge-gold">Premium</span>';
-    if (t === 1) return '<span class="badge badge-purple">Tier 1</span>';
-    return '<span class="badge badge-gray">Free</span>';
-  }
-  function escHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
-  }
-
-  // ── Auth ───────────────────────────────────────────────────────────────
-  async function checkAuth() {
-    try {
-      const r = await fetch('/admin/api/check');
-      const d = await r.json();
-      if (d.authed) showDashboard();
-      else showLogin();
-    } catch { showLogin(); }
-  }
-
-  function showLogin() {
-    $('#login-screen').style.display = 'flex';
-    $('#dashboard').style.display = 'none';
-  }
-  function showDashboard() {
-    $('#login-screen').style.display = 'none';
-    $('#dashboard').style.display = 'block';
-    loadAll();
-  }
-
-  $('#admin-login-btn').addEventListener('click', doLogin);
-  $('#admin-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-
-  async function doLogin() {
-    const pw = $('#admin-pw').value;
-    const r = await fetch('/admin/api/login', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw }),
-    });
-    if (r.ok) { showDashboard(); }
-    else { $('#login-error').style.display = 'block'; }
-  }
-
-  $('#logout-btn').addEventListener('click', async () => {
-    await fetch('/admin/api/logout', { method: 'POST' });
-    showLogin();
+// ── Range buttons ────────────────────────────────────────────────────────────
+$$('.range-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    chartRange=btn.dataset.range;
+    $$('.range-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    loadChart();
   });
+});
+async function loadChart(){
+  const r=await fetch('/admin/api/stats?chart='+chartRange);
+  const d=await r.json();
+  drawChart(d.chart);
+}
 
-  // ── Tabs ───────────────────────────────────────────────────────────────
-  $$('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      $$('.tab-btn').forEach(b => b.classList.remove('active'));
-      $$('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      $(`#tab-${btn.dataset.tab}`).classList.add('active');
-    });
-  });
+// ── Stats Cards ──────────────────────────────────────────────────────────────
+async function loadStats(){
+  const r=await fetch('/admin/api/stats?chart='+chartRange);
+  const d=await r.json();
+  const grid=$('#stat-grid');
+  grid.innerHTML=`
+    <div class="stat-card c-accent"><div class="s-icon">👥</div><div class="s-label">Total Users</div><div class="s-value">${fmtNum(d.totalUsers)}</div></div>
+    <div class="stat-card c-cyan"><div class="s-icon">📈</div><div class="s-label">Signups (24h)</div><div class="s-value">${fmtNum(d.signups24h)}</div></div>
+    <div class="stat-card c-green"><div class="s-icon">🟢</div><div class="s-label">Active Now</div><div class="s-value">${fmtNum(d.activeNow)}</div><div class="s-sub">last 5 minutes</div></div>
+    <div class="stat-card c-cyan"><div class="s-icon">👁</div><div class="s-label">Visits (24h)</div><div class="s-value">${fmtNum(d.visits.past24h)}</div></div>
+    <div class="stat-card c-accent"><div class="s-icon">⏱</div><div class="s-label">Visits (30m)</div><div class="s-value">${fmtNum(d.visits.past30m)}</div></div>
+    <div class="stat-card c-orange"><div class="s-icon">📊</div><div class="s-label">All-Time Visits</div><div class="s-value">${fmtNum(d.visits.allTime)}</div></div>
+    <div class="stat-card c-gold"><div class="s-icon">⭐</div><div class="s-label">Tier 1 Users</div><div class="s-value">${fmtNum(d.tier1Count)}</div></div>
+    <div class="stat-card c-orange"><div class="s-icon">💎</div><div class="s-label">Premium Users</div><div class="s-value">${fmtNum(d.tier2Count)}</div></div>
+    <div class="stat-card c-green"><div class="s-icon">💳</div><div class="s-label">Paid Users</div><div class="s-value">${fmtNum(d.paidCount)}</div></div>
+  `;
+  drawChart(d.chart);
+  renderCategories(d.categoryHits);
+}
 
-  // ── Data Loading ───────────────────────────────────────────────────────
-  let refreshing = false;
-  async function loadAll() {
-    if (refreshing) return;
-    refreshing = true;
-    const btn = $('#refresh-btn');
-    btn.innerHTML = '<span class="refresh-spin" style="display:inline-block">&#x21bb;</span> Loading...';
-    try {
-      await Promise.all([loadStats(), loadSignups(), loadPayments(), loadTiers(), loadUsers()]);
-    } catch (e) { console.error(e); }
-    btn.innerHTML = '&#x21bb; Refresh';
-    refreshing = false;
+// ── Chart ────────────────────────────────────────────────────────────────────
+function drawChart(chart){
+  if(!chart)return;
+  const {labels,data,rangeTotal,allTime}=chart;
+  const totalLabel=typeof rangeTotal==='number'?fmtNum(rangeTotal)+' visits':(typeof allTime==='number'?fmtNum(allTime)+' all time':'');
+  $('#chart-total').textContent=totalLabel;
+
+  const canvas=$('#visit-chart');
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.parentElement.clientWidth;
+  const h=canvas.parentElement.clientHeight;
+  canvas.width=w*dpr;canvas.height=h*dpr;
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+
+  const max=Math.max(...data,1);
+  const pad={l:44,r:12,t:12,b:28};
+  const cw=w-pad.l-pad.r;
+  const ch=h-pad.t-pad.b;
+  const barCount=data.length;
+  const barGap=Math.max(1,Math.min(4,cw/barCount*0.15));
+  const barW=Math.max(3,(cw/barCount)-barGap);
+
+  // Gridlines
+  const gridLines=5;
+  for(let i=0;i<=gridLines;i++){
+    const y=pad.t+(ch/gridLines)*i;
+    ctx.strokeStyle='rgba(255,255,255,.04)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();
+    ctx.fillStyle='#444';ctx.font='10px sans-serif';ctx.textAlign='right';
+    ctx.fillText(Math.round(max-(max/gridLines)*i),pad.l-6,y+3);
   }
-  $('#refresh-btn').addEventListener('click', loadAll);
 
-  // Auto-refresh every 30s
-  setInterval(() => { if ($('#dashboard').style.display !== 'none') loadAll(); }, 30000);
+  // Gradient
+  const grad=ctx.createLinearGradient(0,pad.t,0,pad.t+ch);
+  grad.addColorStop(0,'rgba(124,58,237,.9)');
+  grad.addColorStop(0.5,'rgba(34,211,238,.7)');
+  grad.addColorStop(1,'rgba(34,211,238,.3)');
 
-  // ── Stats Cards ────────────────────────────────────────────────────────
-  async function loadStats() {
-    const r = await fetch('/admin/api/stats');
-    const d = await r.json();
-    const grid = $('#stat-grid');
-    grid.innerHTML = `
-      <div class="stat-card accent"><div class="label">Total Users</div><div class="value">${d.totalUsers}</div></div>
-      <div class="stat-card cyan"><div class="label">Signups (24h)</div><div class="value">${d.signups24h}</div></div>
-      <div class="stat-card green"><div class="label">Active Now</div><div class="value">${d.activeNow}</div><div class="sub">Last 5 minutes</div></div>
-      <div class="stat-card"><div class="label">Visits (24h)</div><div class="value">${d.visits.past24h}</div></div>
-      <div class="stat-card"><div class="label">Visits (30m)</div><div class="value">${d.visits.past30m}</div></div>
-      <div class="stat-card"><div class="label">All-Time Visits</div><div class="value">${(d.visits.allTime || 0).toLocaleString()}</div></div>
-      <div class="stat-card gold"><div class="label">Tier 1 Users</div><div class="value">${d.tier1Count}</div></div>
-      <div class="stat-card orange"><div class="label">Premium Users</div><div class="value">${d.tier2Count}</div></div>
-      <div class="stat-card"><div class="label">Paid Users</div><div class="value">${d.paidCount}</div></div>
-    `;
-    drawChart(d.hourlyVisits);
+  // Area fill behind bars
+  ctx.beginPath();
+  ctx.moveTo(pad.l,pad.t+ch);
+  for(let i=0;i<barCount;i++){
+    const x=pad.l+i*(barW+barGap)+barW/2;
+    const barH=Math.max(0,(data[i]/max)*ch);
+    const y=pad.t+ch-barH;
+    ctx.lineTo(x,y);
+  }
+  ctx.lineTo(pad.l+(barCount-1)*(barW+barGap)+barW/2,pad.t+ch);
+  ctx.closePath();
+  const areaGrad=ctx.createLinearGradient(0,pad.t,0,pad.t+ch);
+  areaGrad.addColorStop(0,'rgba(124,58,237,.15)');
+  areaGrad.addColorStop(1,'rgba(34,211,238,.02)');
+  ctx.fillStyle=areaGrad;ctx.fill();
+
+  // Bars
+  for(let i=0;i<barCount;i++){
+    const x=pad.l+i*(barW+barGap);
+    const barH=Math.max(data[i]>0?2:0,(data[i]/max)*ch);
+    const y=pad.t+ch-barH;
+    ctx.fillStyle=grad;
+    ctx.beginPath();ctx.roundRect(x,y,barW,barH,[3,3,0,0]);ctx.fill();
   }
 
-  // ── Chart ──────────────────────────────────────────────────────────────
-  let chartInstance = null;
-  function drawChart(hourly) {
-    const canvas = $('#visit-chart');
-    const ctx = canvas.getContext('2d');
-    // Simple bar chart (no external lib)
-    const { labels, data } = hourly;
-    const max = Math.max(...data, 1);
-    const w = canvas.parentElement.clientWidth;
-    const h = canvas.parentElement.clientHeight;
-    canvas.width = w * (window.devicePixelRatio || 1);
-    canvas.height = h * (window.devicePixelRatio || 1);
-    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
-    ctx.clearRect(0, 0, w, h);
-
-    const barCount = data.length;
-    const padding = 40;
-    const barGap = 2;
-    const barW = Math.max(4, (w - padding * 2) / barCount - barGap);
-    const chartH = h - padding - 20;
-
-    // Y-axis gridlines
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const y = padding / 2 + (chartH / 4) * i;
-      ctx.beginPath(); ctx.moveTo(padding, y); ctx.lineTo(w - 10, y); ctx.stroke();
-      ctx.fillStyle = '#555';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(Math.round(max - (max / 4) * i), padding - 6, y + 4);
-    }
-
-    // Bars
-    const gradient = ctx.createLinearGradient(0, 0, 0, chartH);
-    gradient.addColorStop(0, '#7c3aed');
-    gradient.addColorStop(1, '#22d3ee');
-
-    for (let i = 0; i < barCount; i++) {
-      const x = padding + i * (barW + barGap);
-      const barH = Math.max(1, (data[i] / max) * chartH);
-      const y = padding / 2 + chartH - barH;
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.roundRect(x, y, barW, barH, [3, 3, 0, 0]);
-      ctx.fill();
-
-      // Label every 3rd
-      if (i % 3 === 0 || i === barCount - 1) {
-        ctx.fillStyle = '#666';
-        ctx.font = '9px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(labels[i], x + barW / 2, h - 4);
-      }
+  // Labels
+  ctx.fillStyle='#555';ctx.font='9px sans-serif';ctx.textAlign='center';
+  const labelEvery=barCount>20?3:barCount>12?2:1;
+  for(let i=0;i<barCount;i++){
+    if(labels[i]&&(i%labelEvery===0||i===barCount-1)){
+      const x=pad.l+i*(barW+barGap)+barW/2;
+      ctx.fillText(labels[i],x,h-4);
     }
   }
+}
 
-  // ── Signups Table ──────────────────────────────────────────────────────
-  async function loadSignups() {
-    const r = await fetch('/admin/api/signups');
-    const d = await r.json();
-    const body = $('#signups-body');
-    if (!d.signups.length) { body.innerHTML = '<tr><td colspan="5" style="color:var(--text2);text-align:center;padding:24px">No signups recorded yet (since server restart)</td></tr>'; return; }
-    body.innerHTML = d.signups.map(s => `
-      <tr>
-        <td>${timeAgo(s.ts)}</td>
-        <td>${escHtml(s.username)}</td>
-        <td><span class="badge badge-cyan">${escHtml(s.provider)}</span></td>
-        <td>${escHtml(s.ip)}</td>
-        <td>${s.referredBy ? escHtml(s.referredBy) : '<span style="color:var(--text2)">Direct</span>'}</td>
-      </tr>
-    `).join('');
-  }
+// ── Signups ──────────────────────────────────────────────────────────────────
+async function loadSignups(){
+  const r=await fetch('/admin/api/signups');const d=await r.json();
+  $('#signup-count').textContent=d.signups.length;
+  const body=$('#signups-body');
+  if(!d.signups.length){body.innerHTML='<tr class="empty-row"><td colspan="5">No signups recorded since restart</td></tr>';return}
+  body.innerHTML=d.signups.map(s=>`<tr>
+    <td>${timeAgo(s.ts)}</td>
+    <td><strong>${escHtml(s.username)}</strong></td>
+    <td><span class="badge b-cyan">${escHtml(s.provider)}</span></td>
+    <td><code style="color:var(--text2);font-size:.78rem">${escHtml(s.ip)}</code></td>
+    <td>${s.referredBy?'<span class="badge b-purple">'+escHtml(s.referredBy)+'</span>':'<span style="color:var(--text3)">Direct</span>'}</td>
+  </tr>`).join('');
+}
 
-  // ── Payments Table ─────────────────────────────────────────────────────
-  async function loadPayments() {
-    const r = await fetch('/admin/api/payments');
-    const d = await r.json();
-    const body = $('#payments-body');
-    if (!d.payments.length) { body.innerHTML = '<tr><td colspan="6" style="color:var(--text2);text-align:center;padding:24px">No payments recorded yet</td></tr>'; return; }
-    body.innerHTML = d.payments.map(p => `
-      <tr>
-        <td>${timeAgo(p.ts)}</td>
-        <td>${escHtml(p.username)}</td>
-        <td>${PLAN_LABELS[p.plan] || escHtml(p.plan)}</td>
-        <td>${METHOD_LABELS[p.method] || escHtml(p.method)}</td>
-        <td>${tierBadge(p.grantedTier)}</td>
-        <td>${p.screenshotB64 ? '<img class="screenshot-thumb" src="data:' + escHtml(p.contentType || 'image/png') + ';base64,' + p.screenshotB64 + '" onclick="window._showSS(this.src)">' : '—'}</td>
-      </tr>
-    `).join('');
-  }
+// ── Payments ─────────────────────────────────────────────────────────────────
+async function loadPayments(){
+  const r=await fetch('/admin/api/payments');const d=await r.json();
+  $('#payment-count').textContent=d.payments.length;
+  const body=$('#payments-body');
+  if(!d.payments.length){body.innerHTML='<tr class="empty-row"><td colspan="6">No payments recorded yet</td></tr>';return}
+  body.innerHTML=d.payments.map(p=>`<tr>
+    <td>${timeAgo(p.ts)}</td>
+    <td><strong>${escHtml(p.username)}</strong></td>
+    <td>${PLAN_LABELS[p.plan]||escHtml(p.plan)}</td>
+    <td>${METHOD_LABELS[p.method]||escHtml(p.method)}</td>
+    <td>${tierBadge(p.grantedTier)}</td>
+    <td>${p.screenshotB64?'<img class="screenshot-thumb" src="data:'+escHtml(p.contentType||'image/png')+';base64,'+p.screenshotB64+'" onclick="window._showSS(this.src)">':'—'}</td>
+  </tr>`).join('');
+}
+window._showSS=function(src){$('#ss-modal-img').src=src;$('#ss-modal').classList.add('active')};
+$('#ss-modal').addEventListener('click',()=>{$('#ss-modal').classList.remove('active')});
 
-  // Screenshot lightbox
-  window._showSS = function(src) {
-    const m = $('#ss-modal');
-    $('#ss-modal-img').src = src;
-    m.classList.add('active');
-  };
-  $('#ss-modal').addEventListener('click', () => { $('#ss-modal').classList.remove('active'); });
+// ── Tiers ────────────────────────────────────────────────────────────────────
+async function loadTiers(){
+  const r=await fetch('/admin/api/tiers');const d=await r.json();
+  $('#tier-count').textContent=d.tiers.length;
+  const body=$('#tiers-body');
+  if(!d.tiers.length){body.innerHTML='<tr class="empty-row"><td colspan="3">No tier unlocks recorded yet</td></tr>';return}
+  body.innerHTML=d.tiers.map(t=>`<tr>
+    <td>${timeAgo(t.ts)}</td>
+    <td><strong>${escHtml(t.username)}</strong></td>
+    <td>${tierBadge(t.tier)}</td>
+  </tr>`).join('');
+}
 
-  // ── Tiers Table ────────────────────────────────────────────────────────
-  async function loadTiers() {
-    const r = await fetch('/admin/api/tiers');
-    const d = await r.json();
-    const body = $('#tiers-body');
-    if (!d.tiers.length) { body.innerHTML = '<tr><td colspan="3" style="color:var(--text2);text-align:center;padding:24px">No tier unlocks recorded yet</td></tr>'; return; }
-    body.innerHTML = d.tiers.map(t => `
-      <tr>
-        <td>${timeAgo(t.ts)}</td>
-        <td>${escHtml(t.username)}</td>
-        <td>${tierBadge(t.tier)}</td>
-      </tr>
-    `).join('');
-  }
+// ── Categories ───────────────────────────────────────────────────────────────
+function renderCategories(hits){
+  const el=$('#cat-bars');
+  const entries=Object.entries(hits||{}).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length){el.innerHTML='<p style="color:var(--text3);padding:24px;text-align:center">No category views since restart</p>';return}
+  const maxVal=Math.max(...entries.map(e=>e[1]),1);
+  el.innerHTML=entries.map(([name,count])=>{
+    const pct=Math.max(4,(count/maxVal)*100);
+    return`<div class="cat-bar"><div class="cat-name">${escHtml(name)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%">${fmtNum(count)}</div></div></div>`;
+  }).join('');
+}
 
-  // ── Categories ─────────────────────────────────────────────────────────
-  function renderCategories(catHits) {
-    const el = $('#cat-bars');
-    const entries = Object.entries(catHits || {}).sort((a, b) => b[1] - a[1]);
-    if (!entries.length) { el.innerHTML = '<p style="color:var(--text2)">No category views yet (since server restart)</p>'; return; }
-    const maxVal = Math.max(...entries.map(e => e[1]), 1);
-    el.innerHTML = entries.map(([name, count]) => {
-      const pct = Math.max(3, (count / maxVal) * 100);
-      return `<div class="cat-bar">
-        <div class="cat-name">${escHtml(name)}</div>
-        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%">${count}</div></div>
-      </div>`;
-    }).join('');
-  }
+// ── Users ────────────────────────────────────────────────────────────────────
+let usersPage=0,usersQuery='';
+async function loadUsers(page,q){
+  if(page!==undefined)usersPage=page;if(q!==undefined)usersQuery=q;
+  const r=await fetch(`/admin/api/users?page=${usersPage}&q=${encodeURIComponent(usersQuery)}`);
+  const d=await r.json();
+  const body=$('#users-body');
+  body.innerHTML=d.users.map(u=>`<tr>
+    <td><span class="dot ${u.online?'dot-on':'dot-off'}"></span>${u.online?'<span style="color:var(--green);font-weight:600">Online</span>':(u.lastSeen?'<span style="color:var(--text2)">'+timeAgo(u.lastSeen)+'</span>':'<span style="color:var(--text3)">Never</span>')}</td>
+    <td><strong>${escHtml(u.username)}</strong></td>
+    <td><span class="badge b-cyan">${escHtml(u.provider)}</span></td>
+    <td>${tierBadge(u.tier)}</td>
+    <td>${u.referredCount}</td>
+    <td><code style="color:var(--text2);font-size:.78rem">${escHtml(u.signupIp)}</code></td>
+    <td>${timeAgo(u.createdAt)}</td>
+    <td><button class="btn btn-primary" style="padding:5px 12px;font-size:.75rem" onclick="window._viewUser('${escHtml(u.key)}')">View</button></td>
+  </tr>`).join('');
+  const totalPages=Math.ceil(d.total/d.perPage);
+  const pg=$('#users-pagination');
+  pg.innerHTML=`<span>${fmtNum(d.total)} users · Page ${d.page+1} of ${Math.max(1,totalPages)}</span>`;
+  if(d.page>0)pg.innerHTML+=`<button class="btn btn-ghost" onclick="window._usersPage(${d.page-1})">← Prev</button>`;
+  if(d.page+1<totalPages)pg.innerHTML+=`<button class="btn btn-ghost" onclick="window._usersPage(${d.page+1})">Next →</button>`;
+}
+window._usersPage=function(p){loadUsers(p)};
+$('#user-search-btn').addEventListener('click',()=>loadUsers(0,$('#user-search').value));
+$('#user-search').addEventListener('keydown',e=>{if(e.key==='Enter')loadUsers(0,e.target.value)});
 
-  // ── Users Table ────────────────────────────────────────────────────────
-  let usersPage = 0;
-  let usersQuery = '';
-
-  async function loadUsers(page, q) {
-    if (page !== undefined) usersPage = page;
-    if (q !== undefined) usersQuery = q;
-    const r = await fetch(`/admin/api/users?page=${usersPage}&q=${encodeURIComponent(usersQuery)}`);
-    const d = await r.json();
-    const body = $('#users-body');
-    body.innerHTML = d.users.map(u => `
-      <tr>
-        <td><span class="dot ${u.online ? 'dot-green' : 'dot-gray'}"></span>${u.online ? 'Online' : (u.lastSeen ? timeAgo(u.lastSeen) : 'Never')}</td>
-        <td>${escHtml(u.username)}</td>
-        <td><span class="badge badge-cyan">${escHtml(u.provider)}</span></td>
-        <td>${tierBadge(u.tier)}</td>
-        <td>${u.referredCount}</td>
-        <td>${escHtml(u.signupIp)}</td>
-        <td>${timeAgo(u.createdAt)}</td>
-        <td><button class="btn-sm btn-accent" onclick="window._viewUser('${escHtml(u.key)}')">View</button></td>
-      </tr>
-    `).join('');
-    // Pagination
-    const totalPages = Math.ceil(d.total / d.perPage);
-    const pg = $('#users-pagination');
-    pg.innerHTML = `<span style="color:var(--text2);font-size:0.85rem">${d.total} users — Page ${d.page + 1} of ${Math.max(1, totalPages)}</span>`;
-    if (d.page > 0) pg.innerHTML += `<button class="btn-sm btn-outline" onclick="window._usersPage(${d.page - 1})">← Prev</button>`;
-    if (d.page + 1 < totalPages) pg.innerHTML += `<button class="btn-sm btn-outline" onclick="window._usersPage(${d.page + 1})">Next →</button>`;
-  }
-
-  window._usersPage = function(p) { loadUsers(p); };
-
-  $('#user-search-btn').addEventListener('click', () => { loadUsers(0, $('#user-search').value); });
-  $('#user-search').addEventListener('keydown', e => { if (e.key === 'Enter') loadUsers(0, e.target.value); });
-
-  // ── User Detail Modal ──────────────────────────────────────────────────
-  window._viewUser = async function(key) {
-    const r = await fetch(`/admin/api/user?key=${encodeURIComponent(key)}`);
-    if (!r.ok) { alert('User not found'); return; }
-    const u = await r.json();
-    const modal = $('#user-modal');
-    const content = $('#user-modal-content');
-
-    content.innerHTML = `
-      <h2>
-        <span class="dot ${u.online ? 'dot-green' : 'dot-gray'}"></span>
-        ${escHtml(u.username)}
-        <button class="modal-close" id="modal-close-btn">&times;</button>
-      </h2>
+// ── User Detail Modal ────────────────────────────────────────────────────────
+window._viewUser=async function(key){
+  const r=await fetch(`/admin/api/user?key=${encodeURIComponent(key)}`);
+  if(!r.ok){alert('User not found');return}
+  const u=await r.json();
+  const modal=$('#user-modal');const content=$('#user-modal-content');
+  content.innerHTML=`
+    <div class="modal-header">
+      <h2><span class="dot ${u.online?'dot-on':'dot-off'}"></span>${escHtml(u.username)}</h2>
+      <button class="modal-close" id="mc-btn">&times;</button>
+    </div>
+    <div class="modal-body">
       <div class="detail-grid">
-        <div class="detail-item"><div class="dlabel">Key</div><div class="dvalue">${escHtml(u.key)}</div></div>
-        <div class="detail-item"><div class="dlabel">Provider</div><div class="dvalue">${escHtml(u.provider)}</div></div>
-        <div class="detail-item"><div class="dlabel">Tier</div><div class="dvalue">${tierBadge(u.tier)}</div></div>
-        <div class="detail-item"><div class="dlabel">Status</div><div class="dvalue">${u.online ? '<span class="badge badge-green">Online</span>' : '<span class="badge badge-gray">Offline</span>'}</div></div>
-        <div class="detail-item"><div class="dlabel">Last Seen</div><div class="dvalue">${u.lastSeen ? fmtDate(u.lastSeen) + ' (' + timeAgo(u.lastSeen) + ')' : 'Never'}</div></div>
-        <div class="detail-item"><div class="dlabel">Created</div><div class="dvalue">${fmtDate(u.createdAt)}</div></div>
-        <div class="detail-item"><div class="dlabel">Signup IP</div><div class="dvalue">${escHtml(u.signupIp)}</div></div>
-        <div class="detail-item"><div class="dlabel">Referral Code</div><div class="dvalue">${u.referralCode || '—'}</div></div>
-        <div class="detail-item"><div class="dlabel">Referred By</div><div class="dvalue">${u.referredBy || 'Direct'}</div></div>
-        <div class="detail-item"><div class="dlabel">Password</div><div class="dvalue">${u.salt || '—'}</div></div>
-        ${u.discordId ? '<div class="detail-item"><div class="dlabel">Discord ID</div><div class="dvalue">' + escHtml(u.discordId) + '</div></div>' : ''}
-        ${u.purchaseDate ? '<div class="detail-item"><div class="dlabel">Purchase</div><div class="dvalue">' + escHtml(u.purchaseMethod || '?') + ' on ' + fmtDate(u.purchaseDate) + '</div></div>' : ''}
-        ${u.premiumPaidAt ? '<div class="detail-item"><div class="dlabel">Stripe Premium</div><div class="dvalue">' + fmtDate(u.premiumPaidAt) + '</div></div>' : ''}
+        <div class="detail-item"><div class="dl">Key</div><div class="dv">${escHtml(u.key)}</div></div>
+        <div class="detail-item"><div class="dl">Provider</div><div class="dv"><span class="badge b-cyan">${escHtml(u.provider)}</span></div></div>
+        <div class="detail-item"><div class="dl">Tier</div><div class="dv">${tierBadge(u.tier)}</div></div>
+        <div class="detail-item"><div class="dl">Status</div><div class="dv">${u.online?'<span class="badge b-green">● Online</span>':'<span class="badge b-gray">○ Offline</span>'}</div></div>
+        <div class="detail-item"><div class="dl">Last Seen</div><div class="dv">${u.lastSeen?fmtDate(u.lastSeen)+' ('+timeAgo(u.lastSeen)+')':'Never'}</div></div>
+        <div class="detail-item"><div class="dl">Created</div><div class="dv">${fmtDate(u.createdAt)}</div></div>
+        <div class="detail-item"><div class="dl">Signup IP</div><div class="dv"><code>${escHtml(u.signupIp)}</code></div></div>
+        <div class="detail-item"><div class="dl">Referral Code</div><div class="dv">${u.referralCode||'—'}</div></div>
+        <div class="detail-item"><div class="dl">Referred By</div><div class="dv">${u.referredBy||'Direct'}</div></div>
+        <div class="detail-item"><div class="dl">Password</div><div class="dv">${u.salt||'—'}</div></div>
+        ${u.discordId?'<div class="detail-item"><div class="dl">Discord ID</div><div class="dv">'+escHtml(u.discordId)+'</div></div>':''}
+        ${u.purchaseDate?'<div class="detail-item"><div class="dl">Purchase</div><div class="dv">'+escHtml(u.purchaseMethod||'?')+' · '+fmtDate(u.purchaseDate)+'</div></div>':''}
+        ${u.premiumPaidAt?'<div class="detail-item"><div class="dl">Stripe Premium</div><div class="dv">'+fmtDate(u.premiumPaidAt)+'</div></div>':''}
       </div>
-      ${u.referredUsers && u.referredUsers.length ? '<div class="referred-list"><h4>Referred Users (' + u.referredUsers.length + ')</h4><ul>' + u.referredUsers.map(r => '<li>' + escHtml(r.username) + ' <span style="color:var(--text2)">(' + escHtml(r.key) + ')</span></li>').join('') + '</ul></div>' : ''}
-      <div class="detail-actions">
-        <select class="tier-select" id="tier-select-modal">
-          <option value="0" ${u.tier === 0 || u.tier === null ? 'selected' : ''}>Free (No Tier)</option>
-          <option value="1" ${u.tier === 1 ? 'selected' : ''}>Tier 1</option>
-          <option value="2" ${u.tier === 2 ? 'selected' : ''}>Premium (Tier 2)</option>
-        </select>
-        <button class="btn-sm btn-accent" id="save-tier-btn">Save Tier</button>
-        <button class="btn-sm btn-red" id="delete-user-btn">Delete User</button>
-      </div>
-    `;
+      ${u.referredUsers&&u.referredUsers.length?'<div class="referred-list"><h4>Referred Users ('+u.referredUsers.length+')</h4><ul>'+u.referredUsers.map(r=>'<li>'+escHtml(r.username)+' <span style="color:var(--text3)">('+escHtml(r.key)+')</span></li>').join('')+'</ul></div>':''}
+    </div>
+    <div class="modal-actions">
+      <select class="tier-select" id="ts-modal">
+        <option value="0" ${!u.tier||u.tier===0?'selected':''}>Free (No Tier)</option>
+        <option value="1" ${u.tier===1?'selected':''}>Tier 1</option>
+        <option value="2" ${u.tier===2?'selected':''}>Premium (Tier 2)</option>
+      </select>
+      <button class="btn btn-primary" id="save-tier-btn">Save Tier</button>
+      <button class="btn" style="background:var(--red);color:#fff" id="del-user-btn">Delete User</button>
+    </div>`;
+  modal.classList.add('active');
+  $('#mc-btn').addEventListener('click',()=>modal.classList.remove('active'));
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('active')});
+  $('#save-tier-btn').addEventListener('click',async()=>{
+    const nt=parseInt($('#ts-modal').value,10);
+    const resp=await fetch('/admin/api/user/set-tier',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:u.key,tier:nt})});
+    if(resp.ok){alert('Tier updated!');modal.classList.remove('active');loadUsers();loadStats()}
+    else{const err=await resp.json().catch(()=>({}));alert('Error: '+(err.error||'Unknown'))}
+  });
+  $('#del-user-btn').addEventListener('click',async()=>{
+    if(!confirm('Delete '+u.username+'? This cannot be undone.'))return;
+    const resp=await fetch('/admin/api/user/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:u.key})});
+    if(resp.ok){alert('User deleted');modal.classList.remove('active');loadUsers();loadStats()}
+    else{const err=await resp.json().catch(()=>({}));alert('Error: '+(err.error||'Unknown'))}
+  });
+};
 
-    modal.classList.add('active');
-
-    // Close
-    $('#modal-close-btn').addEventListener('click', () => modal.classList.remove('active'));
-    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('active'); });
-
-    // Save tier
-    $('#save-tier-btn').addEventListener('click', async () => {
-      const newTier = parseInt($('#tier-select-modal').value, 10);
-      const resp = await fetch('/admin/api/user/set-tier', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: u.key, tier: newTier }),
-      });
-      if (resp.ok) {
-        alert('Tier updated!');
-        modal.classList.remove('active');
-        loadUsers(); loadStats();
-      } else {
-        const err = await resp.json().catch(() => ({}));
-        alert('Error: ' + (err.error || 'Unknown'));
-      }
-    });
-
-    // Delete user
-    $('#delete-user-btn').addEventListener('click', async () => {
-      if (!confirm('Are you sure you want to DELETE ' + u.username + '? This cannot be undone.')) return;
-      const resp = await fetch('/admin/api/user/delete', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: u.key }),
-      });
-      if (resp.ok) {
-        alert('User deleted');
-        modal.classList.remove('active');
-        loadUsers(); loadStats();
-      } else {
-        const err = await resp.json().catch(() => ({}));
-        alert('Error: ' + (err.error || 'Unknown'));
-      }
-    });
-  };
-
-  // ── Stats load also populates categories ───────────────────────────────
-  const _origLoadStats = loadStats;
-  loadStats = async function() {
-    const r = await fetch('/admin/api/stats');
-    const d = await r.json();
-    const grid = $('#stat-grid');
-    grid.innerHTML = `
-      <div class="stat-card accent"><div class="label">Total Users</div><div class="value">${d.totalUsers}</div></div>
-      <div class="stat-card cyan"><div class="label">Signups (24h)</div><div class="value">${d.signups24h}</div></div>
-      <div class="stat-card green"><div class="label">Active Now</div><div class="value">${d.activeNow}</div><div class="sub">Last 5 minutes</div></div>
-      <div class="stat-card"><div class="label">Visits (24h)</div><div class="value">${d.visits.past24h}</div></div>
-      <div class="stat-card"><div class="label">Visits (30m)</div><div class="value">${d.visits.past30m}</div></div>
-      <div class="stat-card"><div class="label">All-Time Visits</div><div class="value">${(d.visits.allTime || 0).toLocaleString()}</div></div>
-      <div class="stat-card gold"><div class="label">Tier 1 Users</div><div class="value">${d.tier1Count}</div></div>
-      <div class="stat-card orange"><div class="label">Premium Users</div><div class="value">${d.tier2Count}</div></div>
-      <div class="stat-card"><div class="label">Paid Users</div><div class="value">${d.paidCount}</div></div>
-    `;
-    drawChart(d.hourlyVisits);
-    renderCategories(d.categoryHits);
-  };
-
-  // ── Init ───────────────────────────────────────────────────────────────
-  checkAuth();
+// ── Init ─────────────────────────────────────────────────────────────────────
+checkAuth();
 })();
 </script>
 </body>
