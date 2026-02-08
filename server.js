@@ -1116,6 +1116,17 @@ async function ensureUsersDb() {
   return await ensureUsersDbFresh();
 }
 
+/**
+ * Return the in-memory usersDb without re-reading from R2/disk.
+ * Only loads from R2 on very first call when usersDb is null.
+ * Use this inside the signup lock to avoid overwriting in-memory
+ * state with stale R2 data before the previous write has landed.
+ */
+async function getOrLoadUsersDb() {
+  if (usersDb) return usersDb;
+  return await ensureUsersDbFresh();
+}
+
 async function ensureUsersDbFresh() {
   // Avoid reloading mid-write.
   await usersDbWritePromise.catch(() => {});
@@ -1771,7 +1782,7 @@ const server = http.createServer(async (req, res) => {
       const releaseSignupLock = await acquireSignupLock();
       try {
 
-      const db = await ensureUsersDbFresh();
+      const db = await getOrLoadUsersDb();
       if (userExistsByUsername(db, username)) {
         return sendJson(res, 409, { error: 'That username is already taken' });
       }
@@ -2505,7 +2516,7 @@ const server = http.createServer(async (req, res) => {
       const releaseSignupLock = await acquireSignupLock();
       let isNewDiscordUser;
       try {
-      const db = await ensureUsersDbFresh();
+      const db = await getOrLoadUsersDb();
       const userKey = `discord_${discordId}`;
       isNewDiscordUser = !db.users[userKey];
       if (isNewDiscordUser) {
@@ -2672,7 +2683,7 @@ const server = http.createServer(async (req, res) => {
       let isNewGoogleUser;
       try {
       // User upsert
-      const db = await ensureUsersDbFresh();
+      const db = await getOrLoadUsersDb();
       const userKey = `google_${googleId}`;
       isNewGoogleUser = !db.users[userKey];
       if (isNewGoogleUser) {
